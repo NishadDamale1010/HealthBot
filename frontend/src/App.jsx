@@ -2,14 +2,32 @@ import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import "./App.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 function App() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState("");
+  const [language, setLanguage] = useState("en"); // 🌐 NEW
   const chatEndRef = useRef(null);
+
+  // 🌐 Language Labels
+  const langMap = {
+    en: {
+      name: "English",
+      placeholder: "Describe your symptoms...",
+    },
+    hi: {
+      name: "हिंदी",
+      placeholder: "अपने लक्षण बताएं...",
+    },
+    mr: {
+      name: "मराठी",
+      placeholder: "तुमचे लक्षण सांगा...",
+    },
+  };
 
   // 🔥 Auto Scroll
   useEffect(() => {
@@ -26,6 +44,7 @@ function App() {
     try {
       const res = await axios.post(`${API_BASE_URL}/api/chat`, {
         message,
+        lang: language, // 🌐 SEND LANGUAGE
       });
 
       const botMsg = {
@@ -45,7 +64,7 @@ function App() {
     setLoading(false);
   };
 
-  // 🎤 Voice Input
+  // 🎤 Voice Input (MULTILINGUAL)
   const startVoice = () => {
     if (!("webkitSpeechRecognition" in window)) {
       setAlert("❌ Voice not supported in this browser");
@@ -53,7 +72,11 @@ function App() {
     }
 
     const recognition = new window.webkitSpeechRecognition();
-    recognition.lang = "en-IN";
+
+    // 🌐 Set language dynamically
+    if (language === "hi") recognition.lang = "hi-IN";
+    else if (language === "mr") recognition.lang = "mr-IN";
+    else recognition.lang = "en-IN";
 
     recognition.onstart = () => {
       setAlert("🎤 Listening...");
@@ -81,6 +104,17 @@ function App() {
       <div className="header">
         🧠 AI Health Assistant
         <small>Early Detection • Preventive Care</small>
+
+        {/* 🌐 Language Selector */}
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          className="lang-select"
+        >
+          <option value="en">English</option>
+          <option value="hi">हिंदी</option>
+          <option value="mr">मराठी</option>
+        </select>
       </div>
 
       {/* ✅ Alert */}
@@ -90,13 +124,10 @@ function App() {
       <div className="chat-box">
         {chat.map((msg, index) => (
           <div key={index} className={`message ${msg.sender}`}>
-
-            {/* Avatar */}
             <div className="avatar">
               {msg.sender === "bot" ? "🤖" : "🧑"}
             </div>
 
-            {/* Content */}
             <div className="content">
               <div className="text">{msg.text}</div>
 
@@ -129,7 +160,7 @@ function App() {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyPress}
-          placeholder="Describe your symptoms..."
+          placeholder={langMap[language].placeholder} // 🌐 Dynamic
         />
 
         <button
