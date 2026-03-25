@@ -1,0 +1,11 @@
+node_modules
+.wwwcache
+dist    
+logs
+*.log
+.wwwbjs_auth
+.wwwbjs_cache
+/backend/.env
+/backend/.env.local
+/backend/.wwbjs_cache
+/backend/.wwbjs_auth
