@@ -13,4 +13,4 @@ logs
 .env.local
 .wwbjs_cache
 .wwbjs_auth
-/backend/.env
+/backend/.envv
