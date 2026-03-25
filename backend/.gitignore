@@ -9,3 +9,8 @@ logs
 /backend/.env.local
 /backend/.wwbjs_cache
 /backend/.wwbjs_auth
+.env
+.env.local
+.wwbjs_cache
+.wwbjs_auth
+/backend/.env
