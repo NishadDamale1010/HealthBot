@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
+import HealthInsights from "./pages/HealthInsights";
 
 function App() {
   const navigate = useNavigate();
@@ -25,19 +26,25 @@ function App() {
   return (
     <div className="layout">
       <header className="topbar">
-        <div className="brand" role="banner">
+        <div className="brand">
           HealthBot
           <span className="brand-sub">AI Disease Awareness</span>
         </div>
 
+        {/* ✅ SINGLE CLEAN NAVBAR */}
         <nav className="topbar-nav">
-          <Link className="topbar-link" to="/chat">
-            Chat
-          </Link>
+          <Link className="topbar-link" to="/chat">Chat</Link>
+
           {token && (
-            <Link className="topbar-link" to="/dashboard">
-              Dashboard
-            </Link>
+            <>
+              <Link className="topbar-link" to="/dashboard">
+                Dashboard
+              </Link>
+
+              <Link className="topbar-link" to="/health">
+                🧠 Health Insights
+              </Link>
+            </>
           )}
         </nav>
 
@@ -55,11 +62,9 @@ function App() {
               Logout
             </button>
           ) : (
-            <>
-              <Link className="auth-btn" to="/login">
-                Login
-              </Link>
-            </>
+            <Link className="auth-btn" to="/login">
+              Login
+            </Link>
           )}
         </div>
       </header>
@@ -71,6 +76,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/health" element={<HealthInsights />} />
         </Routes>
       </main>
     </div>

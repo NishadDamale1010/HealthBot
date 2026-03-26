@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import "../App.css";
 import API from "../services/api";
 import SeasonalAlert from "../components/SeasonalAlert";
 
@@ -9,8 +8,8 @@ export default function Chat() {
     const [loading, setLoading] = useState(false);
     const [alert, setAlert] = useState("");
     const [language, setLanguage] = useState("en");
-    const [showIntro, setShowIntro] = useState(false);
-
+    const [listening, setListening] = useState(false);
+    const recognitionRef = useRef(null);
     const chatEndRef = useRef(null);
 
     const langMap = {
@@ -19,28 +18,18 @@ export default function Chat() {
         mr: { placeholder: "तुमचे लक्षण सांगा..." },
     };
 
-    // ✅ Auto scroll
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chat, loading]);
 
-    // ✅ First visit intro message (FIXED)
-    useEffect(() => {
-        const firstVisit = !localStorage.getItem("visited");
-
-        if (firstVisit) {
-            const introMsg = {
-                sender: "bot",
-                text: `⚠️ Seasonal Alert:
-Common diseases: Dengue, Malaria
-Stay safe!`,
-                risk: "Low",
-            };
-
-            setChat([introMsg]);
-            localStorage.setItem("visited", "true");
+    const handleMic = () => {
+        if (!recognitionRef.current) {
+            alert("Speech not supported in this browser");
+            return;
         }
-    }, []);
+
+        recognitionRef.current.start();
+    };
 
     const sendMessage = async () => {
         if (!message.trim()) return;
@@ -63,7 +52,6 @@ Stay safe!`,
 
             setChat((prev) => [...prev, botMsg]);
         } catch (err) {
-            console.error("Chat request failed:", err?.response?.data || err?.message);
             setAlert("⚠️ Server error");
             setTimeout(() => setAlert(""), 3000);
         }
@@ -76,124 +64,178 @@ Stay safe!`,
         if (e.key === "Enter") sendMessage();
     };
 
+    const getRiskColor = (risk) => {
+        switch (risk?.toLowerCase()) {
+            case "high":
+                return "bg-red-500";
+            case "medium":
+                return "bg-yellow-400 text-black";
+            default:
+                return "bg-green-500";
+        }
+    };
+    useEffect(() => {
+        if (!("webkitSpeechRecognition" in window)) return;
+
+        const recognition = new window.webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = language === "hi" ? "hi-IN" : language === "mr" ? "mr-IN" : "en-US";
+
+        recognition.onstart = () => setListening(true);
+
+        recognition.onend = () => setListening(false);
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setMessage(transcript);
+        };
+
+        recognitionRef.current = recognition;
+    }, [language]);
     return (
-        <div>
+        <div className="min-h-screen flex flex-col items-center">
+
             <SeasonalAlert />
 
-            <div className="main-layout">
-
-                {/* 🔥 LEFT SIDE LOGO */}
-                <div className="side-logo">
-                    <img src="/logo.png" alt="Team Innovators" />
-                    <span>Team Innovators</span>
+            {/* HEADER */}
+            <div className="w-full max-w-4xl mt-4 bg-white shadow-sm rounded-xl px-4 py-3 flex justify-between items-center border">
+                <div>
+                    <h1 className="text-lg font-semibold text-green-600">
+                        🩺 AI Health Assistant
+                    </h1>
+                    <p className="text-xs text-gray-500">
+                        {localStorage.getItem("token")
+                            ? "Personalized mode enabled"
+                            : "No login required"}
+                    </p>
                 </div>
 
-                <div className="app">
+                <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="border rounded-md px-2 py-1 text-sm"
+                >
+                    <option value="en">English</option>
+                    <option value="hi">हिंदी</option>
+                    <option value="mr">मराठी</option>
+                </select>
+            </div>
 
-                    {/* 🔷 HEADER */}
-                    <div className="header">
-                        <div className="header-row">
-                            <div className="left-header">
-                                <span className="brand-mini">🧠 AI Health Assistant</span>
-                            </div>
+            {/* CHAT CONTAINER */}
+            <div className="w-full max-w-4xl mt-3 bg-white rounded-xl shadow-md flex flex-col h-[65vh] border">
 
-                            <span className="header-sub">
-                                {localStorage.getItem("token")
-                                    ? "Personalized mode enabled"
-                                    : "No login required"}
-                            </span>
-                        </div>
+                {/* MESSAGES */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
 
-                        <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value)}
-                            className="lang-select"
-                        >
-                            <option value="en">English</option>
-                            <option value="hi">हिंदी</option>
-                            <option value="mr">मराठी</option>
-                        </select>
-                    </div>
+                    {/* 🔥 INTRO SCREEN */}
+                    {chat.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center">
 
-                    {/* ⚠️ ALERT */}
-                    {alert && <div className="alert">{alert}</div>}
+                            <img
+                                src="/logo.png"
+                                alt="logo"
+                                className="w-16 h-16 mb-3"
+                            />
 
-                    {/* 💬 CHAT BOX */}
-                    <div className="chat-box">
-                        {chat.map((msg, i) => (
-                            <div key={i} className={`message ${msg.sender}`}>
-                                <div className="avatar">
-                                    {msg.sender === "bot" ? "🤖" : "🧑"}
+                            <h2 className="text-lg font-semibold text-green-600">
+                                HealthBot Assistant
+                            </h2>
+
+                            <p className="text-sm text-gray-500 mt-1">
+                                Smart AI for disease awareness & guidance
+                            </p>
+
+                            {/* FEATURES */}
+                            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs max-w-md">
+
+                                <div className="bg-green-50 px-3 py-2 rounded-lg">
+                                    🩺 Symptom Checker
                                 </div>
 
-                                <div className="content">
-                                    <div className="text">{msg.text}</div>
-
-                                    {msg.sender === "bot" && (
-                                        <span
-                                            className={`badge ${String(msg.risk || "Low").toLowerCase()}`}
-                                        >
-                                            {msg.risk} Risk
-                                        </span>
-                                    )}
+                                <div className="bg-blue-50 px-3 py-2 rounded-lg">
+                                    📊 Health Insights
                                 </div>
-                            </div>
-                        ))}
 
-                        {/* ⏳ Typing */}
-                        {loading && (
-                            <div className="typing">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                        )}
+                                <div className="bg-purple-50 px-3 py-2 rounded-lg">
+                                    ⚡ Instant AI Advice
+                                </div>
 
-                        <div ref={chatEndRef}></div>
-                    </div>
-
-                    {/* 📝 INPUT */}
-                    <div className="input-box">
-                        <input
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            onKeyDown={handleKeyPress}
-                            placeholder={langMap[language].placeholder}
-                        />
-
-                        <button onClick={sendMessage}>Send</button>
-                    </div>
-
-                    {/* 🤖 FLOATING BOT */}
-                    <div className="floating-bot" onClick={() => setShowIntro(true)}>
-                        <img src="/bot.png" alt="Chatbot" />
-                    </div>
-
-                    {/* 📢 POPUP */}
-                    {showIntro && (
-                        <div className="popup">
-                            <div className="popup-content">
-                                <h3>🤖 About HealthBot</h3>
-
-                                <p>
-                                    I am your AI Health Assistant 🤖. I help you understand symptoms,
-                                    provide disease awareness, and suggest preventive measures.
-                                </p>
-
-                                <ul>
-                                    <li>✔ Symptom Analysis</li>
-                                    <li>✔ Disease Awareness</li>
-                                    <li>✔ Preventive Tips</li>
-                                    <li>✔ Multi-language Support</li>
-                                </ul>
-
-                                <button onClick={() => setShowIntro(false)}>
-                                    Close
-                                </button>
                             </div>
                         </div>
                     )}
+
+                    {/* CHAT MESSAGES */}
+                    {chat.map((msg, i) => (
+                        <div
+                            key={i}
+                            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                            <div
+                                className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${msg.sender === "user"
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-gray-100"
+                                    } max-w-[70%]`}
+                            >
+                                {msg.text}
+
+                                {msg.sender === "bot" && (
+                                    <div
+                                        className={`text-xs mt-2 inline-block px-2 py-1 rounded-full text-white ${getRiskColor(msg.risk)}`}
+                                    >
+                                        {msg.risk} Risk
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+
+                    {loading && (
+                        <div className="text-gray-400 text-sm">Typing...</div>
+                    )}
+
+                    <div ref={chatEndRef}></div>
                 </div>
+
+                {/* INPUT */}
+                <div className="border-t p-3 flex gap-2 items-center">
+
+                    <input
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        placeholder={langMap[language].placeholder}
+                        className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+
+                    {/* 🎤 MIC BUTTON */}
+                    <button
+                        onClick={handleMic}
+                        className={`px-3 py-2 rounded-full transition ${listening
+                                ? "bg-red-500 text-white animate-pulse"
+                                : "bg-gray-200"
+                            }`}
+                    >
+                        🎤
+                    </button>
+
+                    {/* SEND */}
+                    <button
+                        onClick={sendMessage}
+                        className="bg-green-600 text-white px-5 py-2 rounded-full hover:bg-green-700 transition text-sm"
+                    >
+                        Send
+                    </button>
+                </div>
+            </div>
+
+            {/* FLOATING BOT */}
+            <div className="fixed bottom-6 right-6">
+                <img
+                    src="/bot.png"
+                    alt="bot"
+                    className="w-14 h-14 rounded-full shadow-lg hover:scale-110 transition cursor-pointer"
+                />
             </div>
         </div>
     );

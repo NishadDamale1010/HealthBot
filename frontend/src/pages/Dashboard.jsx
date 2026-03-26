@@ -9,7 +9,6 @@ function toCsv(arr) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-
   const token = localStorage.getItem("token");
 
   const [loading, setLoading] = useState(true);
@@ -52,9 +51,10 @@ export default function Dashboard() {
           allergies: toCsv(p.allergies),
           medications: toCsv(p.medications),
         });
+
         setWhatsappIdInput(p.whatsappId ?? "");
       } catch (err) {
-        setError(err?.response?.data?.message || "Failed to load dashboard");
+        setError("Failed to load dashboard");
       } finally {
         setLoading(false);
       }
@@ -76,10 +76,10 @@ export default function Dashboard() {
 
       const profileRes = await API.get("/api/profile/me");
       setProfile(profileRes.data.profile);
-      setError("Profile updated successfully");
+      setError("✅ Profile updated successfully");
       setTimeout(() => setError(""), 2500);
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to update profile");
+    } catch {
+      setError("❌ Failed to update profile");
     }
   };
 
@@ -87,13 +87,15 @@ export default function Dashboard() {
     try {
       setError("");
       await API.post("/api/profile/link-whatsapp", { whatsappId: whatsappIdInput });
+
       const profileRes = await API.get("/api/profile/me");
       setProfile(profileRes.data.profile);
       setWhatsappIdInput(profileRes.data.profile?.whatsappId ?? "");
-      setError("WhatsApp linked successfully");
+
+      setError("✅ WhatsApp linked successfully");
       setTimeout(() => setError(""), 2500);
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to link WhatsApp");
+    } catch {
+      setError("❌ Failed to link WhatsApp");
     }
   };
 
@@ -105,129 +107,143 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="card">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Loading dashboard...
       </div>
     );
   }
 
   return (
-    <div className="page">
-      <div className="grid">
-        <section className="card">
-          <div className="card-title">Your Health Profile</div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 p-6">
+
+      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-6">
+
+        {/* PROFILE CARD */}
+        <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-blue-600">🧑 Health Profile</h2>
+            <button
+              onClick={() => window.open("/api/report/download", "_blank")}
+              className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-lg shadow hover:scale-105 transition"
+            >
+              📄 Download Report
+            </button>
+          </div>
           {profile && (
-            <div className="muted">
+            <p className="text-sm text-gray-500">
               {profile.name} ({profile.email})
+            </p>
+          )}
+
+          {error && (
+            <div className="bg-blue-100 text-blue-700 text-sm p-2 rounded">
+              {error}
             </div>
           )}
 
-          {error && <div className="notice">{error}</div>}
+          <div className="space-y-3">
 
-          <div className="form">
-            <label className="label">
-              Age
-              <input
-                value={form.age}
-                onChange={updateField("age")}
-                className="input"
-                inputMode="numeric"
-                placeholder="e.g. 28"
-              />
-            </label>
+            <input
+              value={form.age}
+              onChange={updateField("age")}
+              placeholder="Age"
+              className="w-full border rounded-lg px-3 py-2"
+            />
 
-            <label className="label">
-              Gender
-              <select
-                className="input"
-                value={form.gender}
-                onChange={updateField("gender")}
-              >
-                <option value="prefer_not_to_say">Prefer not to say</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
+            <select
+              value={form.gender}
+              onChange={updateField("gender")}
+              className="w-full border rounded-lg px-3 py-2"
+            >
+              <option value="prefer_not_to_say">Prefer not to say</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
 
-            <label className="label">
-              Existing Medical Conditions
-              <input
-                value={form.existingMedicalConditions}
-                onChange={updateField("existingMedicalConditions")}
-                className="input"
-                placeholder="comma-separated (e.g. diabetes, asthma)"
-              />
-            </label>
+            <input
+              value={form.existingMedicalConditions}
+              onChange={updateField("existingMedicalConditions")}
+              placeholder="Medical Conditions"
+              className="w-full border rounded-lg px-3 py-2"
+            />
 
-            <label className="label">
-              Allergies
-              <input
-                value={form.allergies}
-                onChange={updateField("allergies")}
-                className="input"
-                placeholder="comma-separated (e.g. penicillin)"
-              />
-            </label>
+            <input
+              value={form.allergies}
+              onChange={updateField("allergies")}
+              placeholder="Allergies"
+              className="w-full border rounded-lg px-3 py-2"
+            />
 
-            <label className="label">
-              Medications (optional)
-              <input
-                value={form.medications}
-                onChange={updateField("medications")}
-                className="input"
-                placeholder="comma-separated (e.g. metformin)"
-              />
-            </label>
+            <input
+              value={form.medications}
+              onChange={updateField("medications")}
+              placeholder="Medications"
+              className="w-full border rounded-lg px-3 py-2"
+            />
 
-            <button className="primary-btn" onClick={saveProfile} type="button">
+            <button
+              onClick={saveProfile}
+              className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition"
+            >
               Save Profile
             </button>
 
-            <div style={{ height: 10 }} />
+            {/* WhatsApp */}
+            <div className="pt-4 border-t">
+              <h3 className="font-semibold mb-2">📱 WhatsApp Linking</h3>
 
-            <div className="card-title">Optional WhatsApp Linking</div>
-            <div className="muted" style={{ marginBottom: 10 }}>
-              Personalization for WhatsApp works when your WhatsApp id is linked.
-            </div>
-
-            <label className="label">
-              WhatsApp id (example: `12345@c.us`)
               <input
                 value={whatsappIdInput}
                 onChange={(e) => setWhatsappIdInput(e.target.value)}
-                className="input"
-                placeholder="paste msg.from value"
+                placeholder="12345@c.us"
+                className="w-full border rounded-lg px-3 py-2 mb-2"
               />
-            </label>
 
-            <button className="primary-btn" onClick={linkWhatsApp} type="button">
-              Link WhatsApp
-            </button>
+              <button
+                onClick={linkWhatsApp}
+                className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600"
+              >
+                Link WhatsApp
+              </button>
+            </div>
+
           </div>
-        </section>
+        </div>
 
-        <section className="card">
-          <div className="card-title">Recent Chat History</div>
-          <div className="muted">Last {history.length} messages</div>
+        {/* HISTORY CARD */}
+        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col">
 
-          <div className="history">
+          <h2 className="text-xl font-bold text-blue-600 mb-2">
+            💬 Chat History
+          </h2>
+
+          <p className="text-sm text-gray-500 mb-4">
+            Last {history.length} messages
+          </p>
+
+          <div className="flex-1 overflow-y-auto space-y-2">
+
             {history.length === 0 ? (
-              <div className="muted">No chat history yet.</div>
+              <p className="text-gray-400">No chat history yet.</p>
             ) : (
               history.map((m, i) => (
                 <div
-                  key={`${m.createdAt || i}-${i}`}
-                  className={`history-row ${m.role}`}
+                  key={i}
+                  className={`p-3 rounded-lg text-sm max-w-[80%] ${m.role === "user"
+                    ? "ml-auto bg-blue-500 text-white"
+                    : "bg-gray-100"
+                    }`}
                 >
-                  <div className="history-bubble">{m.content}</div>
+                  {m.content}
                 </div>
               ))
             )}
+
           </div>
-        </section>
+        </div>
+
       </div>
     </div>
   );
 }
-

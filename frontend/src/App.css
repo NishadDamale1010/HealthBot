@@ -870,3 +870,67 @@ button:active {
     opacity: 1;
   }
 }
+.health-page {
+    padding: 20px;
+    color: white;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Stats */
+.stats {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.card {
+    background: #1e1e2f;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    width: 150px;
+}
+
+.card h3 {
+    font-size: 28px;
+    margin: 0;
+}
+
+/* Button */
+.download-btn {
+    display: block;
+    margin: 20px auto;
+    padding: 12px 20px;
+    background: #4cafef;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+}
+
+.download-btn:hover {
+    background: #3a9edb;
+}
+
+/* History */
+.history {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.history-card {
+    background: #2a2a40;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.date {
+    font-size: 12px;
+    opacity: 0.7;
+}
