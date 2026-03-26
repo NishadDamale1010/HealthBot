@@ -10,7 +10,7 @@ exports.predict = (req, res) => {
     const results = predictDisease(symptoms);
 
     return res.json({
-        topPrediction: results[0],
-        allPredictions: results
+        topPrediction: results,
+        allPredictions: [results]
     });
 };

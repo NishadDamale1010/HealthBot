@@ -1,7 +1,10 @@
 const axios = require("axios");
 const { predictDisease } = require("../utils/symptoms");
-const { getGeneralAdvice } = require("../utils/medicalKnowledge");
 const { detectLanguage, translateText } = require("../utils/translator");
+const mongoose = require("mongoose");
+
+const User = require("../models/user");
+const ChatMessage = require("../models/chatMessage");
 
 // 🧠 Memory
 const userMemory = {};
@@ -104,6 +107,28 @@ ${predictions.slice(0, 3).map(p => `• ${p.disease}`).join("\n")}
 async function getAIReply(message, userId = "default", forcedLang = null) {
   if (!userMemory[userId]) userMemory[userId] = [];
 
+  // If a user identity is provided, try to fetch their health profile.
+  // - For web chat: identityId is a JWT user id (Mongo ObjectId string)
+  // - For WhatsApp: identityId is `msg.from` which can be linked to a user
+  let userDoc = null;
+  let dbUserId = null;
+  if (userId && userId !== "default") {
+    try {
+      const select = "age gender existingMedicalConditions allergies medications";
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        userDoc = await User.findById(userId).select(select).lean();
+        dbUserId = userDoc?._id || userId;
+      } else {
+        userDoc = await User.findOne({ whatsappId: userId }).select(select).lean();
+        dbUserId = userDoc?._id || null;
+      }
+    } catch (err) {
+      // Never fail chat due to profile lookup issues.
+      userDoc = null;
+      dbUserId = null;
+    }
+  }
+
   // 🌐 Language detect
   const lang = forcedLang || (await detectLanguage(message));
 
@@ -118,7 +143,15 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
     let msg =
       "🚨 This may be a medical emergency. Please go to nearest hospital immediately.";
     if (lang !== "en") msg = await translateText(msg, lang);
-    return msg;
+    return {
+      reply: `${msg}\n\n⚠️ This is not medical advice.`,
+      prediction: {
+        disease: "Unknown",
+        risk: "High",
+        confidence: "0.00",
+        symptomsDetected: [],
+      },
+    };
   }
 
   // 🧠 Extract symptoms (SAFE)
@@ -134,16 +167,22 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
   }
 
   // 🧬 Predict diseases (SAFE)
-  let predictions = [];
+  let prediction = null;
   try {
-    predictions = predictDisease(symptoms.join(" "));
+    prediction = predictDisease(symptoms.join(" ") || msgEn);
   } catch {
-    predictions = [];
+    prediction = null;
   }
 
-  if (!Array.isArray(predictions) || predictions.length === 0) {
-    predictions = [{ disease: "Unknown", score: 0 }];
-  }
+  const predictions = prediction
+    ? [
+        {
+          disease: prediction.disease,
+          score: Number(prediction.confidence) || 0,
+          risk: prediction.risk,
+        },
+      ]
+    : [{ disease: "Unknown", score: 0, risk: "Low" }];
 
   // 🧠 Severity
   const severity = detectSeverity(lower);
@@ -158,7 +197,33 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
     .map(p => `${p.disease} (${p.score})`)
     .join("\n");
 
+  const profileLines = [];
+  if (userDoc) {
+    if (userDoc.age !== undefined && userDoc.age !== null) {
+      profileLines.push(`Age: ${userDoc.age}`);
+    }
+    if (userDoc.gender) {
+      profileLines.push(`Gender: ${userDoc.gender}`);
+    }
+    if (Array.isArray(userDoc.existingMedicalConditions) && userDoc.existingMedicalConditions.length) {
+      profileLines.push(
+        `Existing medical conditions: ${userDoc.existingMedicalConditions.join(", ")}`
+      );
+    }
+    if (Array.isArray(userDoc.allergies) && userDoc.allergies.length) {
+      profileLines.push(`Allergies: ${userDoc.allergies.join(", ")}`);
+    }
+    if (Array.isArray(userDoc.medications) && userDoc.medications.length) {
+      profileLines.push(`Medications (if provided): ${userDoc.medications.join(", ")}`);
+    }
+  }
+
+  const profileText = profileLines.length ? profileLines.join("\n") : "Not provided.";
+
   const prompt = `
+Patient profile (may be incomplete):
+${profileText}
+
 User symptoms: ${symptoms.join(", ") || msgEn}
 
 Possible conditions:
@@ -166,12 +231,18 @@ ${diseaseText}
 
 Severity: ${severity}
 
-Explain:
-- Most likely condition
-- Other possibilities
-- Precautions
-- Keep simple
-- No medicines
+Response structure (plain text):
+Most likely condition:
+Other possible causes:
+Precautions:
+When to seek urgent care:
+Note:
+
+Rules:
+- Use simple, clear language.
+- Do NOT claim diagnosis.
+- Do NOT prescribe medications or dosages.
+- If allergies are provided, include a safety caution about allergy triggers.
 `;
 
   // 🤖 AI
@@ -188,15 +259,46 @@ Explain:
 
   // 🔄 Fallback
   if (!reply) {
-    reply = `🩺 Possible Conditions:
-${predictions.map(p => `• ${p.disease}`).join("\n")}
+    const top = predictions[0]?.disease || "Unknown";
+    const others = predictions.slice(1).map(p => p.disease).filter(Boolean);
 
-📋 Advice:
-• Stay hydrated
-• Take rest
-• Monitor symptoms
+    const profileSafetyLines = [];
+    if (userDoc) {
+      if (userDoc.age !== undefined && userDoc.age !== null) {
+        profileSafetyLines.push(`- Age: ${userDoc.age}`);
+      }
+      if (userDoc.gender) {
+        profileSafetyLines.push(`- Gender: ${userDoc.gender}`);
+      }
+      if (
+        Array.isArray(userDoc.existingMedicalConditions) &&
+        userDoc.existingMedicalConditions.length
+      ) {
+        profileSafetyLines.push(
+          `- Existing conditions: ${userDoc.existingMedicalConditions.join(", ")}`
+        );
+      }
+      if (Array.isArray(userDoc.allergies) && userDoc.allergies.length) {
+        profileSafetyLines.push(
+          `- Allergies: avoid allergy triggers (${userDoc.allergies.join(", ")})`
+        );
+      }
+    }
 
-⚠️ Consult a doctor if needed.`;
+    const profileSafetyText = profileSafetyLines.length
+      ? `\n\nProfile context (safety notes):\n${profileSafetyLines.join("\n")}`
+      : "";
+
+    reply = `Most likely condition: ${top}
+Other possible causes: ${
+  others.length ? others.join(", ") : "Not enough information"
+}
+Precautions:
+- Stay hydrated
+- Rest
+- Monitor symptoms
+When to seek urgent care:
+- If symptoms worsen, become severe, or emergency signs appear${profileSafetyText}`;
   }
 
   // 🤔 Follow-up
@@ -212,19 +314,50 @@ ${predictions.map(p => `• ${p.disease}`).join("\n")}
   // 💾 Save
   userMemory[userId].push({ role: "assistant", content: reply });
 
-  return `${reply}\n\n⚠️ This is not medical advice.`;
+  const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+
+  // Persist chat history for authenticated users (and WhatsApp-linked users).
+  if (dbUserId) {
+    try {
+      await ChatMessage.create({
+        user: dbUserId,
+        role: "user",
+        content: message,
+        lang: lang || "en",
+      });
+      await ChatMessage.create({
+        user: dbUserId,
+        role: "assistant",
+        content: finalReply,
+        lang: lang || "en",
+      });
+    } catch (err) {
+      // History is optional; never break chat due to persistence errors.
+    }
+  }
+
+  return {
+    reply: finalReply,
+    prediction:
+      prediction || {
+        disease: "Unknown",
+        risk: "Low",
+        confidence: "0.00",
+        symptomsDetected: [],
+      },
+  };
 }
 // 🌐 API
 exports.chatWithAI = async (req, res) => {
   try {
-    const { message, userId = "default", lang } = req.body;
+    const { message, lang } = req.body;
 
     if (!message) {
       return res.status(400).json({ message: "Message required" });
     }
 
-    const reply = await getAIReply(message, userId, lang);
-    const prediction = predictDisease(message);
+    const userId = req.user?.id || "default";
+    const { reply, prediction } = await getAIReply(message, userId, lang);
 
     res.json({
       reply,

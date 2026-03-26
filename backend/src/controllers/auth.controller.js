@@ -1,88 +1,67 @@
-const User = require('../models/user');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const User = require("../models/user");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-// 🔐 Generate Token
-const generateToken = (userId) => {
-    return jwt.sign(
-        { userId },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
-    );
-};
-
-// ✅ REGISTER
+// 🔐 REGISTER
 exports.register = async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
-        // 🔍 Validation
-        if (!name || !email || !password) {
-            return res.status(400).json({ message: "All fields are required" });
+        const emailNorm = email ? String(email).trim().toLowerCase() : "";
+
+        if (!emailNorm || !password) {
+            return res.status(400).json({ message: "All fields required" });
         }
 
-        if (password.length < 6) {
-            return res.status(400).json({ message: "Password must be at least 6 characters" });
+        if (String(password).length < 8) {
+            return res.status(400).json({ message: "Password must be at least 8 characters" });
         }
 
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({ email: emailNorm });
         if (existingUser) {
-            return res.status(409).json({ message: "User already exists" });
+            return res.status(400).json({ message: "User already exists" });
         }
 
-        // 🔒 Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser = await User.create({
-            name,
-            email,
+        const user = await User.create({
+            name: name ? String(name).trim() : "",
+            email: emailNorm,
             password: hashedPassword
         });
 
-        // 🎟️ Token
-        const token = generateToken(newUser._id);
-
-        res.status(201).json({
-            message: "User registered successfully",
-            token,
-            user: {
-                id: newUser._id,
-                name: newUser.name,
-                email: newUser.email
-            }
-        });
-
-    } catch (error) {
-        console.error('Register Error:', error.message);
-        res.status(500).json({ message: "Internal Server Error" });
+        res.json({ message: "User registered successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
     }
 };
 
-// ✅ LOGIN
+// 🔐 LOGIN
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 🔍 Validation
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password required" });
-        }
-
-        const user = await User.findOne({ email });
+        const emailNorm = email ? String(email).trim().toLowerCase() : "";
+        const user = await User.findOne({ email: emailNorm });
         if (!user) {
-            return res.status(401).json({ message: "Invalid credentials" });
+            return res.status(400).json({ message: "Invalid credentials" });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(401).json({ message: "Invalid credentials" });
+            return res.status(400).json({ message: "Invalid credentials" });
         }
 
-        // 🎟️ Token
-        const token = generateToken(user._id);
+        if (!process.env.JWT_SECRET) {
+            return res.status(500).json({ message: "Server misconfigured: JWT_SECRET missing" });
+        }
 
-        res.status(200).json({
-            message: "Login successful",
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+            expiresIn: "7d",
+        });
+
+        res.json({
             token,
             user: {
                 id: user._id,
@@ -90,9 +69,8 @@ exports.login = async (req, res) => {
                 email: user.email
             }
         });
-
-    } catch (error) {
-        console.error('Login Error:', error.message);
-        res.status(500).json({ message: "Internal Server Error" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
     }
 };

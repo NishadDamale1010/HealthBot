@@ -4,6 +4,11 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 
+const authRoutes = require("./src/routes/auth.route");
+const chatRoutes = require("./src/routes/chat.routes");
+const predictRoutes = require("./src/routes/predict.routes");
+const profileRoutes = require("./src/routes/profile.routes");
+
 // ✅ Import WhatsApp (DO NOT initialize again)
 require("./src/whatsapp/whatsapp");
 
@@ -11,13 +16,19 @@ dotenv.config();
 const app = express();
 
 // 🔐 Middleware
-app.use(cors());
-app.use(express.json());
+app.disable("x-powered-by");
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "*",
+  })
+);
+app.use(express.json({ limit: "1mb" }));
 
 // 📦 Routes
-app.use("/api/predict", require("./src/routes/predict.routes"));
-app.use("/api/auth", require("./src/routes/auth.route"));
-app.use("/api/chat", require("./src/routes/chat.routes"));
+app.use("/api/predict", predictRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/profile", profileRoutes);
 
 // 🏠 Root
 app.get("/", (req, res) => {
