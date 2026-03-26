@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import "../App.css";
 import API from "../services/api";
+import SeasonalAlert from "../components/SeasonalAlert";
 
 export default function Chat() {
     const [message, setMessage] = useState("");
@@ -18,9 +19,28 @@ export default function Chat() {
         mr: { placeholder: "तुमचे लक्षण सांगा..." },
     };
 
+    // ✅ Auto scroll
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [chat, loading]);
+
+    // ✅ First visit intro message (FIXED)
+    useEffect(() => {
+        const firstVisit = !localStorage.getItem("visited");
+
+        if (firstVisit) {
+            const introMsg = {
+                sender: "bot",
+                text: `⚠️ Seasonal Alert:
+Common diseases: Dengue, Malaria
+Stay safe!`,
+                risk: "Low",
+            };
+
+            setChat([introMsg]);
+            localStorage.setItem("visited", "true");
+        }
+    }, []);
 
     const sendMessage = async () => {
         if (!message.trim()) return;
@@ -57,119 +77,123 @@ export default function Chat() {
     };
 
     return (
-        <div className="main-layout">
+        <div>
+            <SeasonalAlert />
 
-            {/* 🔥 LEFT SIDE BRAND LOGO */}
-            <div className="side-logo">
-                <img src="/logo.png" alt="Team Innovators" />
-                <span>Team Innovators</span>
-            </div>
+            <div className="main-layout">
 
-            <div className="app">
-
-                {/* 🔷 HEADER */}
-                <div className="header">
-                    <div className="header-row">
-                        <div className="left-header">
-                            <span className="brand-mini">🧠 AI Health Assistant</span>
-                        </div>
-
-                        <span className="header-sub">
-                            {localStorage.getItem("token")
-                                ? "Personalized mode enabled"
-                                : "No login required"}
-                        </span>
-                    </div>
-
-                    <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                        className="lang-select"
-                    >
-                        <option value="en">English</option>
-                        <option value="hi">हिंदी</option>
-                        <option value="mr">मराठी</option>
-                    </select>
+                {/* 🔥 LEFT SIDE LOGO */}
+                <div className="side-logo">
+                    <img src="/logo.png" alt="Team Innovators" />
+                    <span>Team Innovators</span>
                 </div>
 
-                {/* ⚠️ ALERT */}
-                {alert && <div className="alert">{alert}</div>}
+                <div className="app">
 
-                {/* 💬 CHAT BOX */}
-                <div className="chat-box">
-                    {chat.map((msg, i) => (
-                        <div key={i} className={`message ${msg.sender}`}>
-                            <div className="avatar">
-                                {msg.sender === "bot" ? "🤖" : "🧑"}
+                    {/* 🔷 HEADER */}
+                    <div className="header">
+                        <div className="header-row">
+                            <div className="left-header">
+                                <span className="brand-mini">🧠 AI Health Assistant</span>
                             </div>
 
-                            <div className="content">
-                                <div className="text">{msg.text}</div>
-
-                                {msg.sender === "bot" && (
-                                    <span
-                                        className={`badge ${String(msg.risk || "Low").toLowerCase()}`}
-                                    >
-                                        {msg.risk} Risk
-                                    </span>
-                                )}
-                            </div>
+                            <span className="header-sub">
+                                {localStorage.getItem("token")
+                                    ? "Personalized mode enabled"
+                                    : "No login required"}
+                            </span>
                         </div>
-                    ))}
 
-                    {/* ⏳ Typing Indicator */}
-                    {loading && (
-                        <div className="typing">
-                            <span></span>
-                            <span></span>
-                            <span></span>
+                        <select
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="lang-select"
+                        >
+                            <option value="en">English</option>
+                            <option value="hi">हिंदी</option>
+                            <option value="mr">मराठी</option>
+                        </select>
+                    </div>
+
+                    {/* ⚠️ ALERT */}
+                    {alert && <div className="alert">{alert}</div>}
+
+                    {/* 💬 CHAT BOX */}
+                    <div className="chat-box">
+                        {chat.map((msg, i) => (
+                            <div key={i} className={`message ${msg.sender}`}>
+                                <div className="avatar">
+                                    {msg.sender === "bot" ? "🤖" : "🧑"}
+                                </div>
+
+                                <div className="content">
+                                    <div className="text">{msg.text}</div>
+
+                                    {msg.sender === "bot" && (
+                                        <span
+                                            className={`badge ${String(msg.risk || "Low").toLowerCase()}`}
+                                        >
+                                            {msg.risk} Risk
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* ⏳ Typing */}
+                        {loading && (
+                            <div className="typing">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        )}
+
+                        <div ref={chatEndRef}></div>
+                    </div>
+
+                    {/* 📝 INPUT */}
+                    <div className="input-box">
+                        <input
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            placeholder={langMap[language].placeholder}
+                        />
+
+                        <button onClick={sendMessage}>Send</button>
+                    </div>
+
+                    {/* 🤖 FLOATING BOT */}
+                    <div className="floating-bot" onClick={() => setShowIntro(true)}>
+                        <img src="/bot.png" alt="Chatbot" />
+                    </div>
+
+                    {/* 📢 POPUP */}
+                    {showIntro && (
+                        <div className="popup">
+                            <div className="popup-content">
+                                <h3>🤖 About HealthBot</h3>
+
+                                <p>
+                                    I am your AI Health Assistant 🤖. I help you understand symptoms,
+                                    provide disease awareness, and suggest preventive measures.
+                                </p>
+
+                                <ul>
+                                    <li>✔ Symptom Analysis</li>
+                                    <li>✔ Disease Awareness</li>
+                                    <li>✔ Preventive Tips</li>
+                                    <li>✔ Multi-language Support</li>
+                                </ul>
+
+                                <button onClick={() => setShowIntro(false)}>
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     )}
-
-                    <div ref={chatEndRef}></div>
                 </div>
-
-                {/* 📝 INPUT BOX */}
-                <div className="input-box">
-                    <input
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        placeholder={langMap[language].placeholder}
-                    />
-
-                    <button onClick={sendMessage}>Send</button>
-                </div>
-
-                {/* 🤖 FLOATING CHATBOT BUTTON */}
-                <div className="floating-bot" onClick={() => setShowIntro(true)}>
-                    <img src="/bot.png" alt="Chatbot" />
-                </div>
-
-                {/* 📢 INTRO POPUP */}
-                {showIntro && (
-                    <div className="popup">
-                        <div className="popup-content">
-                            <h3>🤖 About HealthBot</h3>
-
-                            <p>
-                                I am your AI Health Assistant 🤖. I help you understand symptoms,
-                                provide disease awareness, and suggest preventive measures.
-                            </p>
-
-                            <ul>
-                                <li>✔ Symptom Analysis</li>
-                                <li>✔ Disease Awareness</li>
-                                <li>✔ Preventive Tips</li>
-                                <li>✔ Multi-language Support</li>
-                            </ul>
-
-                            <button onClick={() => setShowIntro(false)}>
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

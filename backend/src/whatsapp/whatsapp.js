@@ -2,17 +2,18 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const { getAIReply } = require("../controllers/chat.controller");
 
-// 🧠 Queue
+// 🌡️ Seasonal Alert utils
+const { getSeasonalData, formatAlert } = require("../utils/getSeasonalData");
+
+// 🧠 Queue system
 const messageQueue = [];
 let isProcessing = false;
 
-// 🔒 Prevent multiple starts
-let isClientStarted = false;
-
-// 🚀 Client
+// 🚀 WhatsApp Client (FIXED CONFIG)
 const client = new Client({
     authStrategy: new LocalAuth({
-        clientId: "health-bot"
+        clientId: "health-bot",
+        dataPath: "./.wwebjs_auth" // ✅ ensures session reuse
     }),
     puppeteer: {
         headless: true,
@@ -20,7 +21,8 @@ const client = new Client({
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-gpu"
+            "--disable-gpu",
+            "--single-process" // 🔥 prevents multiple browser issue
         ],
         timeout: 60000
     }
@@ -29,27 +31,42 @@ const client = new Client({
 // ⚠️ Avoid memory warnings
 client.setMaxListeners(20);
 
-// 🚀 START CLIENT (SAFE)
+// 🔒 Prevent multiple initialization
+let isInitializing = false;
+
+// 🚀 SAFE START FUNCTION
 const startClient = async () => {
-    if (isClientStarted) {
-        console.log("⚠️ WhatsApp already running (session reused)");
+    if (isInitializing) {
+        console.log("⚠️ WhatsApp already initializing...");
+        return;
+    }
+
+    // If already authenticated
+    if (client.info) {
+        console.log("⚠️ WhatsApp already running (session active)");
         return;
     }
 
     try {
+        isInitializing = true;
         console.log("🚀 Starting WhatsApp...");
-        isClientStarted = true;
         await client.initialize();
     } catch (err) {
         console.error("❌ Init error:", err.message);
-        isClientStarted = false;
+    } finally {
+        isInitializing = false;
     }
 };
 
-// 📱 QR (only when needed)
+// 📱 QR Code (only first time)
 client.on("qr", qr => {
     console.log("📱 Scan QR (only first time login)");
     qrcode.generate(qr, { small: true });
+});
+
+// ✅ AUTHENTICATED
+client.on("authenticated", () => {
+    console.log("✅ Authenticated successfully");
 });
 
 // ✅ READY
@@ -71,7 +88,6 @@ client.on("change_state", state => {
 client.on("disconnected", reason => {
     console.log("❌ Disconnected:", reason);
     console.log("⚠️ Restart server to reconnect");
-    isClientStarted = false;
 });
 
 // 🧠 PROCESS QUEUE (ANTI-SPAM)
@@ -83,9 +99,7 @@ async function processQueue() {
     const { msg } = messageQueue.shift();
 
     try {
-        // 🤖 Get AI reply (multilingual auto handled)
         const reply = await getAIReply(msg.body, msg.from);
-
         await msg.reply(reply);
     } catch (err) {
         console.error("❌ Queue error:", err.message);
@@ -97,7 +111,7 @@ async function processQueue() {
 
     isProcessing = false;
 
-    setTimeout(processQueue, 300); // throttle
+    setTimeout(processQueue, 300);
 }
 
 // 📩 MESSAGE HANDLER
@@ -111,10 +125,25 @@ client.on("message", async msg => {
         // ❌ Ignore status
         if (msg.from === "status@broadcast") return;
 
-        // 🧠 Push to queue
-        messageQueue.push({ msg });
+        const text = msg.body.toLowerCase().trim();
 
+        // 🌡️ Seasonal Alert Command
+        if (
+            text.includes("alert") ||
+            text.includes("season") ||
+            text.includes("disease")
+        ) {
+            const data = getSeasonalData(19.07, 72.87); // Mumbai coords
+            const reply = formatAlert(data);
+
+            await msg.reply(reply);
+            return;
+        }
+
+        // 🧠 Default AI Chat
+        messageQueue.push({ msg });
         processQueue();
+
     } catch (err) {
         console.error("❌ Message error:", err.message);
     }
@@ -129,7 +158,7 @@ process.on("unhandledRejection", err => {
     console.error("💥 Unhandled Rejection:", err);
 });
 
-// 🚀 START
+// 🚀 START BOT
 startClient();
 
 module.exports = client;

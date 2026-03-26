@@ -8,6 +8,7 @@ const authRoutes = require("./src/routes/auth.route");
 const chatRoutes = require("./src/routes/chat.routes");
 const predictRoutes = require("./src/routes/predict.routes");
 const profileRoutes = require("./src/routes/profile.routes");
+const seasonalRoutes = require("./src/routes/seasonal.routes");
 
 // ✅ Import WhatsApp (DO NOT initialize again)
 require("./src/whatsapp/whatsapp");
@@ -29,6 +30,7 @@ app.use("/api/predict", predictRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/seasonal-alert", seasonalRoutes);
 
 // 🏠 Root
 app.get("/", (req, res) => {

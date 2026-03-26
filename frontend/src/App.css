@@ -823,3 +823,50 @@ button:active {
 * {
 	transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
+
+/*Seasonal alert */
+.alert-strip {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  
+  background: linear-gradient(135deg, #ff4d4d, #ff944d);
+  color: white;
+  
+  padding: 10px 20px;
+  border-radius: 50px;
+  
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  z-index: 1000;
+
+  animation: slideDown 0.4s ease;
+}
+
+.alert-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translate(-50%, -30px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
