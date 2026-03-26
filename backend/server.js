@@ -18,11 +18,7 @@ const app = express();
 
 // 🔐 Middleware
 app.disable("x-powered-by");
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "*",
-  })
-);
+app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
 // 📦 Routes
