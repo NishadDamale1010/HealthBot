@@ -17,6 +17,67 @@ const emergencyKeywords = [
   "unconscious",
   "severe bleeding"
 ];
+async function openRouterAI(messages) {
+  if (!process.env.OPENROUTER_API_KEY) return null;
+
+  try {
+    const res = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "openai/gpt-3.5-turbo",
+        messages
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    return res.data?.choices?.[0]?.message?.content || null;
+  } catch (err) {
+    console.log("OpenRouter Error:", err.message);
+    return null;
+  }
+}
+async function hfAI(prompt) {
+  if (!process.env.HF_API_KEY) return null;
+
+  try {
+    const res = await axios.post(
+      "https://api-inference.huggingface.co/models/google/flan-t5-large",
+      { inputs: prompt },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.HF_API_KEY}`
+        }
+      }
+    );
+
+    return res.data?.[0]?.generated_text || null;
+  } catch (err) {
+    console.log("HF Error:", err.message);
+    return null;
+  }
+}
+async function geminiAI(prompt) {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  try {
+    const res = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }]
+      }
+    );
+
+    return res.data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (err) {
+    console.log("Gemini Error:", err.message);
+    return null;
+  }
+}
 
 // 🤖 GROQ
 async function groqAI(messages) {
@@ -45,7 +106,45 @@ async function groqAI(messages) {
     return null;
   }
 }
+async function smartAI(messages, promptText) {
+  // 1️⃣ Try Groq (fastest)
+  let reply = await groqAI(messages);
+  if (reply) return reply;
 
+  console.log("⚠️ Groq failed → trying Gemini");
+
+  // 2️⃣ Gemini
+  reply = await geminiAI(promptText);
+  if (reply) return reply;
+
+  console.log("⚠️ Gemini failed → trying OpenRouter");
+
+  // 3️⃣ OpenRouter
+  reply = await openRouterAI(messages);
+  if (reply) return reply;
+
+  console.log("⚠️ OpenRouter failed → trying HuggingFace");
+
+  // 4️⃣ HuggingFace
+  reply = await hfAI(promptText);
+  if (reply) return reply;
+
+  console.log("❌ All AI failed");
+
+  return null;
+}
+
+function detectIntent(message) {
+  const msg = message.toLowerCase();
+
+  const greetings = ["hi", "hello", "hey", "hii", "good morning"];
+  const casual = ["how are you", "what's up", "who are you"];
+
+  if (greetings.some(g => msg.includes(g))) return "greeting";
+  if (casual.some(c => msg.includes(c))) return "casual";
+
+  return "medical";
+}
 // 🧠 Extract Symptoms (AI)
 async function extractSymptoms(message) {
   const res = await groqAI([
@@ -110,11 +209,36 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
   // If a user identity is provided, try to fetch their health profile.
   // - For web chat: identityId is a JWT user id (Mongo ObjectId string)
   // - For WhatsApp: identityId is `msg.from` which can be linked to a user
+
   let userDoc = null;
   let dbUserId = null;
   if (userId && userId !== "default") {
     try {
+      const intent = detectIntent(message);
       const select = "age gender existingMedicalConditions allergies medications";
+      if (intent === "greeting") {
+        return {
+          reply: "👋 Hi! I'm your AI Health Assistant. Tell me your symptoms and I’ll help you.",
+          prediction: {
+            disease: "None",
+            risk: "Low",
+            confidence: "0.00",
+            symptomsDetected: [],
+          }
+        };
+      }
+
+      if (intent === "casual") {
+        return {
+          reply: "😊 I'm here to help with health-related questions. Tell me your symptoms.",
+          prediction: {
+            disease: "None",
+            risk: "Low",
+            confidence: "0.00",
+            symptomsDetected: [],
+          }
+        };
+      }
       if (mongoose.Types.ObjectId.isValid(userId)) {
         userDoc = await User.findById(userId).select(select).lean();
         dbUserId = userDoc?._id || userId;
@@ -176,12 +300,12 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
 
   const predictions = prediction
     ? [
-        {
-          disease: prediction.disease,
-          score: Number(prediction.confidence) || 0,
-          risk: prediction.risk,
-        },
-      ]
+      {
+        disease: prediction.disease,
+        score: Number(prediction.confidence) || 0,
+        risk: prediction.risk,
+      },
+    ]
     : [{ disease: "Unknown", score: 0, risk: "Low" }];
 
   // 🧠 Severity
@@ -248,11 +372,14 @@ Rules:
   // 🤖 AI
   let reply = null;
   try {
-    reply = await groqAI([
-      { role: "system", content: "You are a safe medical assistant." },
-      ...history,
-      { role: "user", content: prompt }
-    ]);
+    reply = await smartAI(
+      [
+        { role: "system", content: "You are a safe medical assistant." },
+        ...history,
+        { role: "user", content: prompt }
+      ],
+      prompt
+    );
   } catch (err) {
     console.log("Groq failed, fallback used");
   }
@@ -290,9 +417,8 @@ Rules:
       : "";
 
     reply = `Most likely condition: ${top}
-Other possible causes: ${
-  others.length ? others.join(", ") : "Not enough information"
-}
+Other possible causes: ${others.length ? others.join(", ") : "Not enough information"
+      }
 Precautions:
 - Stay hydrated
 - Rest
