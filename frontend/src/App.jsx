@@ -5,7 +5,7 @@ import Register from "./pages/Register";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
 import HealthInsights from "./pages/HealthInsights";
-
+import Hospitals from "./pages/Hospitals";
 function App() {
   const navigate = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
@@ -39,6 +39,10 @@ function App() {
             <>
               <Link className="topbar-link" to="/dashboard">
                 Dashboard
+              </Link>
+
+              <Link className="topbar-link" to="/hospitals">
+                🏥 Nearby Hospitals
               </Link>
 
               <Link className="topbar-link" to="/health">
@@ -77,6 +81,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/health" element={<HealthInsights />} />
+          <Route path="/hospitals" element={<Hospitals />} />
         </Routes>
       </main>
     </div>

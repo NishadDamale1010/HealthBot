@@ -10,6 +10,8 @@ const predictRoutes = require("./src/routes/predict.routes");
 const profileRoutes = require("./src/routes/profile.routes");
 const seasonalRoutes = require("./src/routes/seasonal.routes");
 const healthRoutes = require("./src/routes/health.routes");
+const hospitalRoutes = require("./src/routes/hospital.routes");
+
 
 // ✅ Import WhatsApp (DO NOT initialize again)
 require("./src/whatsapp/whatsapp");
@@ -29,6 +31,8 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/seasonal-alert", seasonalRoutes);
 app.use("/api/health" ,healthRoutes)
+app.use("/api/hospitals", hospitalRoutes);
+
 // 🏠 Root
 app.get("/", (req, res) => {
   res.send("🚀 Health AI Backend Running");
