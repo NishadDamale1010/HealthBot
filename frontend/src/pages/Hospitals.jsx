@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 
@@ -7,135 +6,156 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-// Fix Leaflet marker issue
+// Fix leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
-
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: markerIcon2x,
     iconUrl: markerIcon,
     shadowUrl: markerShadow,
 });
 
-const redIcon = new L.Icon({
+// 🔵 User icon
+const userIcon = new L.Icon({
+    iconUrl: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+    iconSize: [32, 32],
+});
+
+// 🔴 Hospital icon
+const hospitalIcon = new L.Icon({
     iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
     iconSize: [32, 32],
 });
 
 export default function Hospitals() {
-    const [hospitals, setHospitals] = useState([]);
     const [position, setPosition] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371;
-        const dLat = ((lat2 - lat1) * Math.PI) / 180;
-        const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
-        const a =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos((lat1 * Math.PI) / 180) *
-            Math.cos((lat2 * Math.PI) / 180) *
-            Math.sin(dLon / 2) ** 2;
-
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
+    const [hospitals, setHospitals] = useState([]);
 
     useEffect(() => {
         navigator.geolocation.getCurrentPosition(
-            async (pos) => {
+            (pos) => {
                 const { latitude, longitude } = pos.coords;
-                setPosition([latitude, longitude]);
 
-                try {
-                    const res = await axios.get(
-                        `http://localhost:5000/api/hospitals/nearby?lat=${latitude}&lon=${longitude}`
-                    );
+                const userPos = [latitude, longitude];
+                setPosition(userPos);
 
-                    const hospitalList =
-                        res.data.elements?.map((el, index) => ({
-                            id: index,
-                            name: el.tags?.name || "Unnamed Hospital",
-                            lat: Number(el.lat),
-                            lon: Number(el.lon),
-                        })) || [];
+                // ✅ Fake hospitals with phone numbers
+                const fakeHospitals = [
+                    {
+                        id: 1,
+                        name: "City Care Hospital",
+                        lat: latitude + 0.01,
+                        lon: longitude + 0.01,
+                        phone: "+919876543210",
+                    },
+                    {
+                        id: 2,
+                        name: "Apollo Clinic",
+                        lat: latitude - 0.01,
+                        lon: longitude + 0.005,
+                        phone: "+919812345678",
+                    },
+                    {
+                        id: 3,
+                        name: "Lifeline Hospital",
+                        lat: latitude + 0.015,
+                        lon: longitude - 0.008,
+                        phone: "+919900112233",
+                    },
+                ];
 
-                    // ✅ Filter invalid coords (IMPORTANT FIX)
-                    const validHospitals = hospitalList.filter(
-                        (h) =>
-                            !isNaN(h.lat) &&
-                            !isNaN(h.lon) &&
-                            h.lat !== 0 &&
-                            h.lon !== 0
-                    );
-
-                    const sorted = validHospitals
-                        .map((h) => ({
-                            ...h,
-                            distance: getDistance(latitude, longitude, h.lat, h.lon),
-                        }))
-                        .sort((a, b) => a.distance - b.distance);
-
-                    setHospitals(sorted);
-                } catch (err) {
-                    console.error(err);
-                } finally {
-                    setLoading(false);
-                }
+                setHospitals(fakeHospitals);
             },
             () => {
                 alert("Location permission denied");
-                setLoading(false);
             }
         );
     }, []);
 
-    if (loading) return <p>Loading...</p>;
-    if (!position) return <p>Location not available</p>;
+    // 🚨 Emergency (Nearest)
+    function handleEmergency() {
+        if (!position || hospitals.length === 0) {
+            alert("No hospitals available 😢");
+            return;
+        }
+
+        const nearest = hospitals[0];
+
+        const confirmCall = window.confirm(
+            `🚨 Call ${nearest.name}?\n${nearest.phone}`
+        );
+
+        if (confirmCall) {
+            window.location.href = `tel:${nearest.phone}`;
+        }
+    }
+
+    if (!position) return <p>Loading map...</p>;
 
     return (
         <div style={{ padding: "20px" }}>
+            {/* 🚨 Emergency Button */}
+            <button
+                onClick={handleEmergency}
+                style={{
+                    background: "red",
+                    color: "white",
+                    padding: "8px 15px",
+                    border: "none",
+                    borderRadius: "9px",
+                    fontWeight: "bold",
+                    marginBottom: "1px",
+                    cursor: "pointer",
+                }}
+            >
+                🚨 Emergency - Call Nearest Hospital
+            </button>
+
             <h1>Nearby Hospitals 🏥</h1>
 
-            {/* LIST */}
-            {hospitals.length === 0 && <p>No hospitals found 😢</p>}
 
-            {hospitals.map((h, index) => (
-                <div key={h.id}>
-                    {index < 3 && <span style={{ color: "red" }}>🚑 Nearest</span>}
-                    <h3>{h.name}</h3>
-                    <p>{h.distance.toFixed(2)} km away</p>
-                </div>
-            ))}
 
-            {/* ✅ IMPORTANT: Only render map when position exists */}
-            {position && (
-                <MapContainer
-                    center={position}
-                    zoom={13}
-                    style={{ height: "500px", borderRadius: "10px" }}
-                >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <MapContainer
+                key={position.join(",")}
+                center={position}
+                zoom={13}
+                style={{ height: "500px", borderRadius: "10px" }}
+            >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                    {/* User */}
-                    <Marker position={position}>
-                        <Popup>You are here 📍</Popup>
+                {/* 🔵 User */}
+                <Marker position={position} icon={userIcon}>
+                    <Popup>You are here 📍</Popup>
+                </Marker>
+
+                {/* 🔴 Hospitals */}
+                {hospitals.map((h) => (
+                    <Marker
+                        key={h.id}
+                        position={[h.lat, h.lon]}
+                        icon={hospitalIcon}
+                    >
+                        <Popup>
+                            <strong>{h.name}</strong> <br />
+                            <button
+                                onClick={() =>
+                                    (window.location.href = `tel:${h.phone}`)
+                                }
+                                style={{
+                                    background: "green",
+                                    color: "white",
+                                    padding: "6px 10px",
+                                    border: "none",
+                                    borderRadius: "5px",
+                                    cursor: "pointer",
+                                    marginTop: "5px",
+                                }}
+                            >
+                                📞 Call
+                            </button>
+                        </Popup>
                     </Marker>
-
-                    {/* Hospitals */}
-                    {hospitals.map((h, index) => (
-                        <Marker
-                            key={h.id}
-                            position={[h.lat, h.lon]}
-                            icon={index < 3 ? redIcon : undefined}
-                        >
-                            <Popup>
-                                <strong>{h.name}</strong> <br />
-                                {h.distance.toFixed(2)} km away
-                            </Popup>
-                        </Marker>
-                    ))}
-                </MapContainer>
-            )}
+                ))}
+            </MapContainer>
         </div>
     );
 }

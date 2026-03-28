@@ -9,6 +9,8 @@ export default function Chat() {
     const [alert, setAlert] = useState("");
     const [language, setLanguage] = useState("en");
     const [listening, setListening] = useState(false);
+    const [emergency, setEmergency] = useState(false);
+
     const recognitionRef = useRef(null);
     const chatEndRef = useRef(null);
 
@@ -16,6 +18,37 @@ export default function Chat() {
         en: { placeholder: "Describe your symptoms..." },
         hi: { placeholder: "अपने लक्षण बताएं..." },
         mr: { placeholder: "तुमचे लक्षण सांगा..." },
+    };
+
+    // 🚨 Emergency keywords
+    const emergencyKeywords = [
+        "chest pain",
+        "heart attack",
+        "not breathing",
+        "unconscious",
+        "heavy bleeding",
+        "stroke",
+        "severe pain",
+        "accident",
+        "fainted",
+    ];
+
+    const playAlarm = () => {
+        const audio = new Audio("/alarm.mp3");
+        audio.play();
+    };
+
+    const detectEmergency = (text, risk) => {
+        const lower = text.toLowerCase();
+
+        const keywordMatch = emergencyKeywords.some((word) =>
+            lower.includes(word)
+        );
+
+        if (risk === "High" || keywordMatch) {
+            setEmergency(true);
+            playAlarm();
+        }
     };
 
     useEffect(() => {
@@ -27,7 +60,6 @@ export default function Chat() {
             alert("Speech not supported in this browser");
             return;
         }
-
         recognitionRef.current.start();
     };
 
@@ -51,6 +83,9 @@ export default function Chat() {
             };
 
             setChat((prev) => [...prev, botMsg]);
+
+            detectEmergency(message, botMsg.risk);
+
         } catch (err) {
             setAlert("⚠️ Server error");
             setTimeout(() => setAlert(""), 3000);
@@ -74,16 +109,23 @@ export default function Chat() {
                 return "bg-green-500";
         }
     };
+
+    // 🎤 Speech Recognition
     useEffect(() => {
         if (!("webkitSpeechRecognition" in window)) return;
 
         const recognition = new window.webkitSpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = language === "hi" ? "hi-IN" : language === "mr" ? "mr-IN" : "en-US";
+
+        recognition.lang =
+            language === "hi"
+                ? "hi-IN"
+                : language === "mr"
+                    ? "mr-IN"
+                    : "en-US";
 
         recognition.onstart = () => setListening(true);
-
         recognition.onend = () => setListening(false);
 
         recognition.onresult = (event) => {
@@ -93,23 +135,56 @@ export default function Chat() {
 
         recognitionRef.current = recognition;
     }, [language]);
+
     return (
         <div className="min-h-screen flex flex-col items-center">
 
             <SeasonalAlert />
 
+            {/* 🚨 EMERGENCY POPUP */}
+            {emergency && (
+                <div className="fixed top-0 left-0 w-full h-full bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-xl text-center shadow-xl max-w-sm">
+
+                        <h2 className="text-xl font-bold text-red-600">
+                            🚨 EMERGENCY DETECTED
+                        </h2>
+
+                        <p className="text-sm mt-2 text-gray-600">
+                            Immediate medical attention required!
+                        </p>
+
+                        <div className="flex gap-3 mt-4 justify-center">
+                            <a
+                                href="tel:102"
+                                className="bg-red-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                📞 Call Ambulance
+                            </a>
+
+                            <button
+                                onClick={() => window.location.href = "/hospitals"}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                            >
+                                🗺 View Hospitals
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setEmergency(false)}
+                            className="mt-4 text-gray-500 text-sm"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* HEADER */}
             <div className="w-full max-w-4xl mt-4 bg-white shadow-sm rounded-xl px-4 py-3 flex justify-between items-center border">
-                <div>
-                    <h1 className="text-lg font-semibold text-green-600">
-                        🩺 AI Health Assistant
-                    </h1>
-                    <p className="text-xs text-gray-500">
-                        {localStorage.getItem("token")
-                            ? "Personalized mode enabled"
-                            : "No login required"}
-                    </p>
-                </div>
+                <h1 className="text-lg font-semibold text-green-600">
+                    🩺 AI Health Assistant
+                </h1>
 
                 <select
                     value={language}
@@ -122,10 +197,9 @@ export default function Chat() {
                 </select>
             </div>
 
-            {/* CHAT CONTAINER */}
+            {/* CHAT */}
             <div className="w-full max-w-4xl mt-3 bg-white rounded-xl shadow-md flex flex-col h-[65vh] border">
 
-                {/* MESSAGES */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
 
                     {/* 🔥 INTRO SCREEN */}
@@ -146,7 +220,6 @@ export default function Chat() {
                                 Smart AI for disease awareness & guidance
                             </p>
 
-                            {/* FEATURES */}
                             <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs max-w-md">
 
                                 <div className="bg-green-50 px-3 py-2 rounded-lg">
@@ -169,19 +242,22 @@ export default function Chat() {
                     {chat.map((msg, i) => (
                         <div
                             key={i}
-                            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                            className={`flex ${msg.sender === "user"
+                                ? "justify-end"
+                                : "justify-start"
+                                }`}
                         >
                             <div
-                                className={`px-4 py-2 rounded-2xl shadow-sm text-sm ${msg.sender === "user"
+                                className={`px-4 py-2 rounded-2xl text-sm ${msg.sender === "user"
                                     ? "bg-blue-500 text-white"
                                     : "bg-gray-100"
-                                    } max-w-[70%]`}
+                                    }`}
                             >
                                 {msg.text}
 
                                 {msg.sender === "bot" && (
                                     <div
-                                        className={`text-xs mt-2 inline-block px-2 py-1 rounded-full text-white ${getRiskColor(msg.risk)}`}
+                                        className={`text-xs mt-2 px-2 py-1 rounded-full text-white ${getRiskColor(msg.risk)}`}
                                     >
                                         {msg.risk} Risk
                                     </div>
@@ -190,52 +266,31 @@ export default function Chat() {
                         </div>
                     ))}
 
-                    {loading && (
-                        <div className="text-gray-400 text-sm">Typing...</div>
-                    )}
-
+                    {loading && <div>Typing...</div>}
                     <div ref={chatEndRef}></div>
                 </div>
 
                 {/* INPUT */}
                 <div className="border-t p-3 flex gap-2 items-center">
-
                     <input
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyDown={handleKeyPress}
                         placeholder={langMap[language].placeholder}
-                        className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                        className="flex-1 border rounded-full px-4 py-2"
                     />
 
-                    {/* 🎤 MIC BUTTON */}
-                    <button
-                        onClick={handleMic}
-                        className={`px-3 py-2 rounded-full transition ${listening
-                                ? "bg-red-500 text-white animate-pulse"
-                                : "bg-gray-200"
-                            }`}
-                    >
+                    <button onClick={handleMic}>
                         🎤
                     </button>
 
-                    {/* SEND */}
                     <button
                         onClick={sendMessage}
-                        className="bg-green-600 text-white px-5 py-2 rounded-full hover:bg-green-700 transition text-sm"
+                        className="bg-green-600 text-white px-4 py-2 rounded-full"
                     >
                         Send
                     </button>
                 </div>
-            </div>
-
-            {/* FLOATING BOT */}
-            <div className="fixed bottom-6 right-6">
-                <img
-                    src="/bot.png"
-                    alt="bot"
-                    className="w-14 h-14 rounded-full shadow-lg hover:scale-110 transition cursor-pointer"
-                />
             </div>
         </div>
     );
