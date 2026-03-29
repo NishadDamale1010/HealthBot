@@ -393,7 +393,10 @@ export default function Chat() {
                 : { type: "followup", message: userMessage, context: answers, lang: language };
             const res = await API.post("/api/chat", payload);
             const { reply, prediction, isProfileQuestion } = res.data;
-            const replyText = reply || "I'm sorry, I couldn't process that.";
+            // Strip any leftover "Risk: ..." line from reply text (backend should already strip it,
+            // but this is a safety net so the risk badge is the single source of truth)
+            const replyText = (reply || "I'm sorry, I couldn't process that.")
+                .replace(/\n*\s*Risk:\s*(High|Medium|Low)\s*$/i, "").trimEnd();
             // Use inferRisk to properly assess severity based on backend + user input
             const risk = isProfileQuestion ? null : inferRisk(prediction?.risk, answers);
             const disease = prediction?.disease;
