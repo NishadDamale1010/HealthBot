@@ -304,10 +304,14 @@ export default function Chat() {
     const [language, setLanguage] = useState("en");
     const [listening, setListening] = useState(false);
     const [emergency, setEmergency] = useState(false);
+    const [imageUploading, setImageUploading] = useState(false);
+    const [imageNote, setImageNote] = useState("");
+    const [imagePreview, setImagePreview] = useState("");
     const [dark, setDark] = useState(() => localStorage.getItem("hb-theme") === "dark");
     const recognitionRef = useRef(null);
     const bottomRef = useRef(null);
     const inputRef = useRef(null);
+    const imageInputRef = useRef(null);
     const alarmCtxRef = useRef(null);
     const alarmIntervalRef = useRef(null);
     /* ── Theme persist ── */
@@ -469,6 +473,44 @@ export default function Chat() {
         setAnswers({ symptom: text });
         setMessages(prev => [...prev, { role: "user", text }]);
         await sendToBackend(text, false);
+    }
+    function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    async function handleMedicalImageSelect(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            showAlert("Please upload an image file (jpg/png/webp).");
+            return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+            showAlert("Image too large. Please upload an image under 4MB.");
+            return;
+        }
+        try {
+            setImageUploading(true);
+            const dataUrl = await fileToDataUrl(file);
+            setImagePreview(dataUrl);
+            setMessages(prev => [...prev, { role: "user", text: `📷 Uploaded image: ${file.name}` }]);
+            const res = await API.post("/api/predict/image", {
+                imageBase64: dataUrl,
+                mimeType: file.type,
+                notes: imageNote.trim(),
+            });
+            const reply = `🖼️ Image Insight\n\n${res.data?.analysis || "Unable to analyze this image."}\n\n⚠️ This is a preliminary AI review. Please consult a doctor for diagnosis.`;
+            setMessages(prev => [...prev, { role: "bot", text: reply }]);
+        } catch {
+            showAlert("Could not analyze the image. Try again.");
+        } finally {
+            setImageUploading(false);
+            e.target.value = "";
+        }
     }
     /* ── Derived ── */
     const currentQ = INTAKE_QUESTIONS[step] || null;
@@ -757,6 +799,48 @@ export default function Chat() {
                         </>
                     )}
                     {/* ── Input bar ── */}
+                    <div style={{
+                        borderTop: "1px solid var(--border)", padding: "10px 14px 8px",
+                        background: "var(--input-bar)", display: "flex", flexDirection: "column", gap: 8,
+                    }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input
+                                value={imageNote}
+                                onChange={(e) => setImageNote(e.target.value)}
+                                placeholder="Optional image note (e.g. rash on arm for 2 days)"
+                                style={{
+                                    flex: 1, background: "var(--input-bg)", border: "1px solid var(--border)",
+                                    borderRadius: 10, padding: "8px 10px", fontSize: 12.5, color: "var(--text-body)",
+                                }}
+                            />
+                            <button
+                                onClick={() => imageInputRef.current?.click()}
+                                disabled={imageUploading}
+                                style={{
+                                    border: "1px solid var(--border)", background: "var(--surface)",
+                                    color: "var(--text-body)", borderRadius: 10, padding: "8px 10px",
+                                    fontSize: 12, cursor: imageUploading ? "not-allowed" : "pointer",
+                                    opacity: imageUploading ? 0.6 : 1,
+                                }}
+                            >
+                                {imageUploading ? "Analyzing..." : "🖼️ Upload Medical Image"}
+                            </button>
+                            <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleMedicalImageSelect}
+                                style={{ display: "none" }}
+                            />
+                        </div>
+                        {imagePreview && (
+                            <img
+                                src={imagePreview}
+                                alt="Uploaded medical preview"
+                                style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 10, border: "1px solid var(--border)" }}
+                            />
+                        )}
+                    </div>
                     <div style={{
                         borderTop: "1px solid var(--border)", padding: "12px 14px",
                         display: "flex", gap: 10, alignItems: "center",
