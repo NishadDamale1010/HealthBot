@@ -19,6 +19,7 @@ exports.predict = (req, res) => {
 exports.predictFromImage = async (req, res) => {
     try {
         const { imageBase64, mimeType = "image/jpeg", notes = "" } = req.body;
+        const allowedMimeTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 
         if (!imageBase64 || typeof imageBase64 !== "string") {
             return res.status(400).json({ message: "imageBase64 is required" });
@@ -30,6 +31,10 @@ exports.predictFromImage = async (req, res) => {
 
         if (!stripped || stripped.length < 100) {
             return res.status(400).json({ message: "Invalid image payload" });
+        }
+
+        if (!allowedMimeTypes.has((mimeType || "").toLowerCase())) {
+            return res.status(400).json({ message: "Unsupported image format. Use JPG, PNG, or WEBP." });
         }
 
         if (stripped.length > 5_000_000) {
@@ -106,7 +111,6 @@ Additional patient note: ${notes || "None"}
     } catch (err) {
         res.status(500).json({
             message: "Failed to analyze image",
-            details: err.message,
         });
     }
 };
