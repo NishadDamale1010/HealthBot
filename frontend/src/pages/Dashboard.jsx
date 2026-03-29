@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import { downloadHealthReport } from "../services/reportDownload";
 
 function toCsv(arr) {
   if (!Array.isArray(arr)) return "";
@@ -67,6 +68,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [downloadingReport, setDownloadingReport] = useState(false);
 
   const [form, setForm] = useState({
     age: "",
@@ -135,6 +137,18 @@ export default function Dashboard() {
 
   const updateField = (key) => (e) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  const handleDownloadReport = async () => {
+    try {
+      setError("");
+      setDownloadingReport(true);
+      await downloadHealthReport();
+    } catch {
+      setError("Unable to download report right now. Please try again.");
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -266,20 +280,19 @@ export default function Dashboard() {
               )}
             </div>
             <button
-              onClick={() => {
-                const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-                const token = localStorage.getItem("token");
-                window.open(`${base}/api/health/report?token=${token}`, "_blank");
-              }}
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
               style={{
                 padding: "8px 14px", borderRadius: 10, border: "none",
                 background: "linear-gradient(135deg, #8b5cf6, #0ea5e9)",
-                color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                color: "#fff", fontWeight: 600, fontSize: 13,
+                cursor: downloadingReport ? "not-allowed" : "pointer",
+                opacity: downloadingReport ? 0.7 : 1,
                 fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
                 display: "flex", alignItems: "center", gap: 6
               }}
             >
-              📄 Report
+              {downloadingReport ? "⏳ Preparing..." : "📄 Report"}
             </button>
           </div>
 
