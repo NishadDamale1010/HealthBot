@@ -1,12 +1,49 @@
 const axios = require("axios");
 
+function toRad(v) {
+    return (v * Math.PI) / 180;
+}
+
+function distanceKm(lat1, lon1, lat2, lon2) {
+    const earthRadius = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function normalizeHospitalElement(el, userLat, userLon) {
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+    if (typeof lat !== "number" || typeof lon !== "number") return null;
+
+    const name = el.tags?.name || "Nearby Hospital";
+    const type = el.tags?.healthcare || el.tags?.amenity || "hospital";
+    const phone = el.tags?.phone || el.tags?.["contact:phone"] || "";
+    const address = [
+        el.tags?.["addr:housenumber"],
+        el.tags?.["addr:street"],
+        el.tags?.["addr:city"],
+    ].filter(Boolean).join(", ");
+
+    return {
+        id: `${el.type || "node"}-${el.id || `${lat}-${lon}`}`,
+        name,
+        lat,
+        lon,
+        type,
+        phone,
+        address,
+        distanceKm: Number(distanceKm(userLat, userLon, lat, lon).toFixed(1)),
+    };
+}
+
 exports.getNearbyHospitals = async (req, res) => {
     try {
         let { lat, lon } = req.query;
 
-        console.log("Incoming coords:", lat, lon);
-
-        // ✅ Validate input
         lat = parseFloat(lat);
         lon = parseFloat(lon);
 
@@ -14,7 +51,6 @@ exports.getNearbyHospitals = async (req, res) => {
             return res.status(400).json({ error: "Invalid lat/lon" });
         }
 
-        // ✅ Overpass query (IMPROVED)
         const query = `
         [out:json][timeout:25];
         (
@@ -36,32 +72,56 @@ exports.getNearbyHospitals = async (req, res) => {
             }
         );
 
-        console.log("✅ Overpass success");
+        const hospitals = (response.data?.elements || [])
+            .map((el) => normalizeHospitalElement(el, lat, lon))
+            .filter(Boolean)
+            .sort((a, b) => a.distanceKm - b.distanceKm)
+            .slice(0, 20);
 
-        res.json(response.data);
+        if (!hospitals.length) {
+            return res.status(200).json({
+                hospitals: [],
+                message: "No hospitals found within 5 km radius.",
+            });
+        }
+
+        res.status(200).json({ hospitals, source: "overpass" });
     } catch (err) {
-        console.error("❌ BACKEND ERROR:", err.message);
-
-        // ✅ Fallback data (VERY IMPORTANT)
         res.status(200).json({
-            elements: [
+            hospitals: [
                 {
+                    id: "fallback-1",
+                    name: "City Care Hospital",
                     lat: 19.076,
                     lon: 72.8777,
-                    tags: { name: "City Care Hospital" },
+                    type: "hospital",
+                    phone: "+919876543210",
+                    address: "",
+                    distanceKm: null,
                 },
                 {
+                    id: "fallback-2",
+                    name: "Apollo Clinic",
                     lat: 19.08,
                     lon: 72.88,
-                    tags: { name: "Apollo Clinic" },
+                    type: "clinic",
+                    phone: "+919812345678",
+                    address: "",
+                    distanceKm: null,
                 },
                 {
+                    id: "fallback-3",
+                    name: "Lifeline Hospital",
                     lat: 19.07,
                     lon: 72.875,
-                    tags: { name: "Lifeline Hospital" },
+                    type: "hospital",
+                    phone: "+919900112233",
+                    address: "",
+                    distanceKm: null,
                 },
             ],
             fallback: true,
+            source: "fallback",
         });
     }
 };

@@ -12,36 +12,36 @@ if (typeof document !== "undefined" && !document.getElementById("hb-fonts")) {
 const INTAKE_QUESTIONS = [
     {
         key: "symptom",
-        text: "Hi! I'm your HealthBot assistant \u{1F44B}\n\nTo give you the best assessment, I'll ask a few quick questions first.\n\nWhat is your main symptom or concern today?",
-        placeholder: "e.g. headache, chest pain, fever\u2026",
+        text: "Hi! I\u2019m your HealthBot assistant \u{1F44B}\n\nI\u2019ll ask a few quick questions so I can guide you better.\n\nWhat is bothering you most right now?",
+        placeholder: "Example: headache, fever, sore throat\u2026",
     },
     {
         key: "duration",
-        text: "How long have you been experiencing this?",
-        placeholder: "e.g. since this morning, 3 days, a week\u2026",
+        text: "When did this start, and is it getting better, worse, or the same?",
+        placeholder: "Example: since last night, 3 days, getting worse\u2026",
     },
     {
         key: "severity",
-        text: "On a scale of 1\u201310, how severe would you say it is?",
-        placeholder: "e.g. 6 out of 10",
+        text: "How strong is it on a scale of 1\u201310 (1 = mild, 10 = very severe)?",
+        placeholder: "Example: 6 out of 10",
         chips: ["1\u20133 \u00B7 Mild", "4\u20136 \u00B7 Moderate", "7\u20139 \u00B7 Severe", "10 \u00B7 Unbearable"],
     },
     {
         key: "location",
-        text: "Where exactly do you feel it? Does it spread anywhere?",
-        placeholder: "e.g. left side of head, spreading to neck\u2026",
+        text: "Where do you feel it most? Does the discomfort spread anywhere else?",
+        placeholder: "Example: left side of head, spreads to neck\u2026",
     },
     {
         key: "extra",
-        text: "Any other symptoms alongside this? (type 'none' if not)",
-        placeholder: "e.g. nausea, dizziness, fever\u2026",
+        text: "Any other symptoms I should know about? (type 'none' if no)",
+        placeholder: "Example: nausea, dizziness, chills\u2026",
     },
 ];
 const QUICK_PROMPTS = [
-    "I have a fever and headache",
-    "Feeling tired and dizzy",
-    "Sore throat and cough",
-    "Stomach pain and nausea",
+    "I have fever and body ache",
+    "I feel tired and dizzy",
+    "I have sore throat and cough",
+    "I have stomach pain and nausea",
 ];
 const LANG_MAP = {
     en: { placeholder: "Type your answer\u2026" },
@@ -308,6 +308,8 @@ export default function Chat() {
     const recognitionRef = useRef(null);
     const bottomRef = useRef(null);
     const inputRef = useRef(null);
+    const alarmCtxRef = useRef(null);
+    const alarmIntervalRef = useRef(null);
     /* ── Theme persist ── */
     useEffect(() => {
         localStorage.setItem("hb-theme", dark ? "dark" : "light");
@@ -332,13 +334,55 @@ export default function Chat() {
         setTimeout(() => pushBotAnimated(INTAKE_QUESTIONS[0].text), 500);
     }, []);
     /* ── Helpers ── */
-    const playAlarm = () => { try { new Audio("/alarm.mp3").play(); } catch { } };
+    const stopAlarm = () => {
+        if (alarmIntervalRef.current) {
+            clearInterval(alarmIntervalRef.current);
+            alarmIntervalRef.current = null;
+        }
+        if (alarmCtxRef.current) {
+            alarmCtxRef.current.close().catch((err) => {
+                console.warn("Unable to stop alarm audio context cleanly:", err);
+            });
+            alarmCtxRef.current = null;
+        }
+    };
+    const playAlarm = () => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            stopAlarm();
+            const ctx = new AudioCtx();
+            alarmCtxRef.current = ctx;
+            const beep = (freq, length, startAt = 0) => {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.type = "sawtooth";
+                oscillator.frequency.setValueAtTime(freq, ctx.currentTime + startAt);
+                gain.gain.setValueAtTime(0.001, ctx.currentTime + startAt);
+                gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + startAt + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + length);
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start(ctx.currentTime + startAt);
+                oscillator.stop(ctx.currentTime + startAt + length);
+            };
+            const pulse = () => {
+                beep(880, 0.18, 0);
+                beep(660, 0.2, 0.22);
+            };
+            pulse();
+            alarmIntervalRef.current = setInterval(pulse, 900);
+        } catch (err) {
+            console.warn("Unable to synthesize emergency alarm sound:", err);
+        }
+    };
     function detectEmergency(text, risk) {
         const lower = text.toLowerCase();
-        if (risk === "High" || EMERGENCY_KEYWORDS.some(w => lower.includes(w))) {
+        if ((risk === "High" || EMERGENCY_KEYWORDS.some(w => lower.includes(w))) && !emergency) {
             setEmergency(true); playAlarm();
         }
     }
+    useEffect(() => () => stopAlarm(), []);
     function showAlert(msg) { setAlert(msg); setTimeout(() => setAlert(""), 3000); }
     /* ── Section-based bot message (max 3-4 cards) ── */
     async function pushBotAnimated(fullText, extra = {}) {
@@ -475,7 +519,11 @@ export default function Chat() {
                                     border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 600,
                                 }}>{"\u{1F3E5}"} Find Hospitals</button>
                             </div>
-                            <button onClick={() => setEmergency(false)} style={{
+                            <button onClick={stopAlarm} style={{
+                                marginTop: 12, color: "#b91c1c", background: "none",
+                                border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                            }}>🔇 Silence alarm</button>
+                            <button onClick={() => { stopAlarm(); setEmergency(false); }} style={{
                                 marginTop: 18, color: "var(--muted)", background: "none",
                                 border: "none", cursor: "pointer", fontSize: 13,
                             }}>Dismiss</button>
@@ -709,6 +757,27 @@ export default function Chat() {
                         </>
                     )}
                     {/* ── Input bar ── */}
+                    <div style={{
+                        borderTop: "1px solid var(--border)", padding: "10px 14px 8px",
+                        background: "var(--input-bar)", display: "flex", flexDirection: "column", gap: 8,
+                    }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                            <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+                                🖼️ Medical image upload (coming soon)
+                            </p>
+                            <button
+                                disabled
+                                style={{
+                                    border: "1px solid var(--border)", background: "var(--surface)",
+                                    color: "var(--text-body)", borderRadius: 10, padding: "8px 10px",
+                                    fontSize: 12, cursor: "not-allowed",
+                                    opacity: 0.6,
+                                }}
+                            >
+                                🖼️ Choose Image
+                            </button>
+                        </div>
+                    </div>
                     <div style={{
                         borderTop: "1px solid var(--border)", padding: "12px 14px",
                         display: "flex", gap: 10, alignItems: "center",

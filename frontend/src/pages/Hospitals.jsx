@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
+import API from "../services/api";
 
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
@@ -40,23 +41,57 @@ export default function Hospitals() {
     const [hospitals, setHospitals] = useState([]);
     const [selected, setSelected] = useState(null);
     const [calling, setCalling] = useState(false);
+    const [loadingHospitals, setLoadingHospitals] = useState(false);
+    const [geoError, setGeoError] = useState("");
+    const [fetchError, setFetchError] = useState("");
 
     useEffect(() => {
         navigator.geolocation.getCurrentPosition(
             ({ coords: { latitude, longitude } }) => {
                 setPosition([latitude, longitude]);
-                setHospitals([
-                    { id: 1, name: "City Care Hospital", lat: latitude + 0.010, lon: longitude + 0.010, phone: "+919876543210", type: "Multi-specialty" },
-                    { id: 2, name: "Apollo Clinic", lat: latitude - 0.010, lon: longitude + 0.005, phone: "+919812345678", type: "General Clinic" },
-                    { id: 3, name: "Lifeline Hospital", lat: latitude + 0.015, lon: longitude - 0.008, phone: "+919900112233", type: "Emergency Care" },
-                    { id: 4, name: "Sunrise Medical Centre", lat: latitude - 0.008, lon: longitude - 0.012, phone: "+919811223344", type: "Diagnostic Centre" },
-                ]);
             },
-            () => alert("Location permission denied")
+            () => setGeoError("Location permission denied. Enable location to find nearby hospitals."),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     }, []);
 
+    useEffect(() => {
+        if (!position) return;
+        const [lat, lon] = position;
+        async function fetchHospitals() {
+            try {
+                setFetchError("");
+                setLoadingHospitals(true);
+                const { data } = await API.get("/api/hospitals/nearby", {
+                    params: { lat, lon },
+                });
+                const normalized = (data?.hospitals || [])
+                    .filter((h) => typeof h.lat === "number" && typeof h.lon === "number")
+                    .map((h, idx) => ({
+                        id: h.id || `h-${idx}`,
+                        name: h.name || "Nearby Hospital",
+                        lat: h.lat,
+                        lon: h.lon,
+                        phone: h.phone || "",
+                        type: h.type || "Hospital",
+                        address: h.address || "",
+                        distanceKm: typeof h.distanceKm === "number"
+                            ? h.distanceKm
+                            : Number(distanceKm(lat, lon, h.lat, h.lon)),
+                    }))
+                    .sort((a, b) => a.distanceKm - b.distanceKm);
+                setHospitals(normalized);
+            } catch {
+                setFetchError("Could not load nearby hospitals. Please retry.");
+            } finally {
+                setLoadingHospitals(false);
+            }
+        }
+        fetchHospitals();
+    }, [position]);
+
     function callHospital(hospital) {
+        if (!hospital.phone) return;
         setCalling(hospital.id);
         setTimeout(() => {
             window.location.href = `tel:${hospital.phone}`;
@@ -65,8 +100,16 @@ export default function Hospitals() {
     }
 
     function handleEmergency() {
-        if (!hospitals.length) return;
-        callHospital(hospitals[0]);
+        if (!hospitals.length) {
+            window.location.href = "tel:112";
+            return;
+        }
+        const firstCallable = hospitals.find((h) => h.phone);
+        if (firstCallable) {
+            callHospital(firstCallable);
+        } else {
+            window.location.href = "tel:112";
+        }
     }
 
     if (!position) {
@@ -84,7 +127,9 @@ export default function Hospitals() {
                     border: "3px solid #fee2e2", borderTop: "3px solid #ef4444",
                     animation: "spin 0.9s linear infinite"
                 }} />
-                <p style={{ color: "#64748b", fontSize: 15 }}>Locating you…</p>
+                <p style={{ color: "#64748b", fontSize: 15 }}>
+                    {geoError || "Locating you…"}
+                </p>
             </div>
         );
     }
@@ -162,6 +207,16 @@ export default function Hospitals() {
                     <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>
                         Showing hospitals near your current location
                     </p>
+                    {geoError && (
+                        <p style={{ color: "#dc2626", fontSize: 13, margin: "8px 0 0" }}>
+                            {geoError}
+                        </p>
+                    )}
+                    {fetchError && (
+                        <p style={{ color: "#dc2626", fontSize: 13, margin: "8px 0 0" }}>
+                            {fetchError}
+                        </p>
+                    )}
                 </div>
 
                 {/* Emergency banner */}
@@ -184,9 +239,19 @@ export default function Hospitals() {
                             <p style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: 15 }}>
                                 Emergency? Call nearest hospital instantly
                             </p>
-                            {nearest && (
+                            {loadingHospitals && (
                                 <p style={{ margin: "2px 0 0", color: "#fecaca", fontSize: 13 }}>
-                                    {nearest.name} · {distanceKm(position[0], position[1], nearest.lat, nearest.lon)} km away
+                                    Finding nearest hospitals...
+                                </p>
+                            )}
+                            {!loadingHospitals && nearest && (
+                                <p style={{ margin: "2px 0 0", color: "#fecaca", fontSize: 13 }}>
+                                    {nearest.name} · {nearest.distanceKm.toFixed(1)} km away
+                                </p>
+                            )}
+                            {!loadingHospitals && !nearest && (
+                                <p style={{ margin: "2px 0 0", color: "#fecaca", fontSize: 13 }}>
+                                    No nearby hospitals found. Tap call for emergency services.
                                 </p>
                             )}
                         </div>
@@ -228,7 +293,9 @@ export default function Hospitals() {
                         </p>
 
                         {hospitals.map((h, i) => {
-                            const dist = distanceKm(position[0], position[1], h.lat, h.lon);
+                            const dist = Number.isFinite(h.distanceKm)
+                                ? h.distanceKm.toFixed(1)
+                                : distanceKm(position[0], position[1], h.lat, h.lon);
                             const isNearest = i === 0;
                             return (
                                 <div
@@ -264,6 +331,11 @@ export default function Hospitals() {
                                         <p style={{ margin: "2px 0 0", fontSize: 12, color: "#94a3b8" }}>
                                             {h.type} · {dist} km
                                         </p>
+                                        {h.address && (
+                                            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b" }}>
+                                                {h.address}
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Call button */}
@@ -275,8 +347,9 @@ export default function Hospitals() {
                                                 ? "linear-gradient(135deg, #94a3b8, #64748b)"
                                                 : "linear-gradient(135deg, #22c55e, #16a34a)"
                                         }}
+                                        disabled={!h.phone}
                                     >
-                                        {calling === h.id ? "⏳" : "📞"}
+                                        {calling === h.id ? "⏳" : h.phone ? "📞" : "🚫"}
                                     </button>
                                 </div>
                             );
@@ -331,18 +404,23 @@ export default function Hospitals() {
                                                 {h.name}
                                             </p>
                                             <p style={{ margin: "0 0 10px", fontSize: 12, color: "#94a3b8" }}>
-                                                {h.type} · {distanceKm(position[0], position[1], h.lat, h.lon)} km
+                                                {h.type} · {(Number.isFinite(h.distanceKm)
+                                                    ? h.distanceKm.toFixed(1)
+                                                    : distanceKm(position[0], position[1], h.lat, h.lon))} km
                                             </p>
                                             <button
                                                 onClick={() => callHospital(h)}
+                                                disabled={!h.phone}
                                                 style={{
                                                     width: "100%", padding: "8px", borderRadius: 8,
                                                     border: "none", background: "linear-gradient(135deg, #22c55e, #16a34a)",
                                                     color: "#fff", fontWeight: 600, fontSize: 13,
-                                                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif"
+                                                    cursor: h.phone ? "pointer" : "not-allowed",
+                                                    opacity: h.phone ? 1 : 0.6,
+                                                    fontFamily: "'DM Sans', sans-serif"
                                                 }}
                                             >
-                                                📞 Call Hospital
+                                                {h.phone ? "📞 Call Hospital" : "Phone unavailable"}
                                             </button>
                                         </div>
                                     </Popup>
