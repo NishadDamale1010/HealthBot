@@ -332,7 +332,13 @@ export default function Chat() {
         setTimeout(() => pushBotAnimated(INTAKE_QUESTIONS[0].text), 500);
     }, []);
     /* ── Helpers ── */
-    const playAlarm = () => { try { new Audio("/alarm.mp3").play(); } catch { } };
+    const playAlarm = () => {
+        try {
+            new Audio("/alarm.mp3").play();
+        } catch (err) {
+            console.warn("Unable to play emergency alarm sound:", err);
+        }
+    };
     function detectEmergency(text, risk) {
         const lower = text.toLowerCase();
         if (risk === "High" || EMERGENCY_KEYWORDS.some(w => lower.includes(w))) {
