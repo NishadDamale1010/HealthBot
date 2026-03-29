@@ -304,6 +304,9 @@ export default function Chat() {
     const [language, setLanguage] = useState("en");
     const [listening, setListening] = useState(false);
     const [emergency, setEmergency] = useState(false);
+    const [imageUploading, setImageUploading] = useState(false);
+    const [imageNote, setImageNote] = useState("");
+    const [imagePreview, setImagePreview] = useState("");
     const [dark, setDark] = useState(() => localStorage.getItem("hb-theme") === "dark");
     const recognitionRef = useRef(null);
     const bottomRef = useRef(null);
@@ -417,7 +420,7 @@ export default function Chat() {
                 await delay(200);
                 await pushBotAnimated(
                     "Thanks for sharing that! I have everything I need. \u{1FA7A} " +
-                    "Tap the Analyze button below and I'll give you a detailed assessment."
+                    "Tap the Analyze button below and I'll give you a detailed assessment ..."
                 );
             }
         } else if (phase === "chat") {
@@ -469,6 +472,44 @@ export default function Chat() {
         setAnswers({ symptom: text });
         setMessages(prev => [...prev, { role: "user", text }]);
         await sendToBackend(text, false);
+    }
+    function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    async function handleMedicalImageSelect(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            showAlert("Please upload an image file (jpg/png/webp).");
+            return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+            showAlert("Image too large. Please upload an image under 4MB.");
+            return;
+        }
+        try {
+            setImageUploading(true);
+            const dataUrl = await fileToDataUrl(file);
+            setImagePreview(dataUrl);
+            setMessages(prev => [...prev, { role: "user", text: `📷 Uploaded image: ${file.name}` }]);
+            const res = await API.post("/api/predict/image", {
+                imageBase64: dataUrl,
+                mimeType: file.type,
+                notes: imageNote.trim(),
+            });
+            const reply = `🖼️ Image Insight\n\n${res.data?.analysis || "Unable to analyze this image."}\n\n⚠️ This is a preliminary AI review. Please consult a doctor for diagnosis.`;
+            setMessages(prev => [...prev, { role: "bot", text: reply }]);
+        } catch {
+            showAlert("Could not analyze the image. Try again.");
+        } finally {
+            setImageUploading(false);
+            e.target.value = "";
+        }
     }
     /* ── Derived ── */
     const currentQ = INTAKE_QUESTIONS[step] || null;

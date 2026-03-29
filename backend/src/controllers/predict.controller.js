@@ -1,4 +1,5 @@
 const { predictDisease } = require("../utils/symptoms");
+const axios = require("axios");
 
 exports.predict = (req, res) => {
     const { symptoms } = req.body;
