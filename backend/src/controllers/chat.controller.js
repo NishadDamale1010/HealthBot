@@ -6,494 +6,548 @@ const mongoose = require("mongoose");
 const User = require("../models/user");
 const ChatMessage = require("../models/chatMessage");
 
-// 🧠 Memory
-const userMemory = {};
+// ─────────────────────────────────────────────
+// 🔧 Constants
+// ─────────────────────────────────────────────
 const MAX_HISTORY = 6;
+const MAX_INPUT_LENGTH = 1000;
+const CHAT_HISTORY_LOAD = 10;
 
-// 🚨 Emergency
-const emergencyKeywords = [
-  "chest pain",
-  "breathing problem",
-  "unconscious",
-  "severe bleeding"
+// ─────────────────────────────────────────────
+// 🧠 In-process memory
+// ─────────────────────────────────────────────
+const userMemory = {};
+
+function initMemory(userId) {
+  if (!userMemory[userId]) {
+    userMemory[userId] = {
+      history: [],
+      profile: {},
+      profileStep: -1,
+      pendingMessage: null,
+      stage: "profile",
+      lastSymptoms: [],
+      lastHealthMessage: null,
+      dbHistoryLoaded: false,   // ✅ FIX: separate flag, NOT tied to history.length
+      dbHistorySummary: "",
+    };
+  }
+  return userMemory[userId];
+}
+
+// ─────────────────────────────────────────────
+// 📋 Profile questions
+// ─────────────────────────────────────────────
+const PROFILE_QUESTIONS = [
+  { key: "age", question: "Before I help you, I need a few quick details.\n\n1️⃣ How old are you?" },
+  { key: "gender", question: "2️⃣ What is your gender? (Male / Female / Other)" },
+  { key: "conditions", question: "3️⃣ Do you have any existing medical conditions?\n(e.g. diabetes, hypertension — or type 'None')" },
+  { key: "allergies", question: "4️⃣ Do you have any known allergies? (or type 'None')" },
+  { key: "medications", question: "5️⃣ Are you currently taking any medications? (or type 'None')" },
 ];
+
+function isProfileComplete(mem) {
+  return mem.profileStep >= PROFILE_QUESTIONS.length;
+}
+
+function recordProfileAnswer(mem, answer) {
+  const q = PROFILE_QUESTIONS[mem.profileStep];
+  if (!q) return;
+  let value = answer.trim();
+
+  // ✅ FIX: normalize gender to match User model allowed values
+  if (q.key === "gender") {
+    const map = {
+      male: "male", m: "male",
+      female: "female", f: "female",
+      other: "other", o: "other",
+    };
+    value = map[value.toLowerCase()] || "other";
+  }
+
+  mem.profile[q.key] = value;
+  mem.profileStep += 1;
+}
+
+function dbProfileComplete(userDoc) {
+  if (!userDoc) return false;
+  return !!(userDoc.age && userDoc.gender);
+}
+
+// ─────────────────────────────────────────────
+// 🚨 Emergency
+// ─────────────────────────────────────────────
+const EMERGENCY_KEYWORDS = ["chest pain", "breathing problem", "unconscious", "severe bleeding"];
+const NEGATION_PREFIXES = ["no ", "not ", "without ", "never ", "don't have ", "do not have "];
+
+function isEmergency(text) {
+  const lower = text.toLowerCase();
+  return EMERGENCY_KEYWORDS.some((keyword) => {
+    const idx = lower.indexOf(keyword);
+    if (idx === -1) return false;
+    const before = lower.slice(Math.max(0, idx - 20), idx);
+    return !NEGATION_PREFIXES.some((neg) => before.endsWith(neg));
+  });
+}
+
+// ─────────────────────────────────────────────
+// 🤖 AI Providers
+// ─────────────────────────────────────────────
 async function openRouterAI(messages) {
   if (!process.env.OPENROUTER_API_KEY) return null;
-
   try {
     const res = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "openai/gpt-3.5-turbo",
-        messages
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
+      { model: "openai/gpt-3.5-turbo", messages, temperature: 0.2, max_tokens: 400 },
+      { headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" } }
     );
-
     return res.data?.choices?.[0]?.message?.content || null;
-  } catch (err) {
-    console.log("OpenRouter Error:", err.message);
-    return null;
-  }
+  } catch (err) { console.warn("OpenRouter Error:", err.message); return null; }
 }
+
+async function groqAI(messages) {
+  if (!process.env.GROQ_API_KEY) return null;
+  try {
+    const res = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      { model: "llama3-8b-8192", messages, temperature: 0.2, max_tokens: 400 },
+      { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" } }
+    );
+    return res.data?.choices?.[0]?.message?.content || null;
+  } catch (err) { console.warn("Groq Error:", err.message); return null; }
+}
+
+async function geminiAI(prompt) {
+  if (!process.env.GEMINI_API_KEY) return null;
+  try {
+    const res = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      { contents: [{ parts: [{ text: prompt }] }] }
+    );
+    return res.data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  } catch (err) { console.warn("Gemini Error:", err.message); return null; }
+}
+
 async function hfAI(prompt) {
   if (!process.env.HF_API_KEY) return null;
-
   try {
     const res = await axios.post(
       "https://api-inference.huggingface.co/models/google/flan-t5-large",
       { inputs: prompt },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HF_API_KEY}`
-        }
-      }
+      { headers: { Authorization: `Bearer ${process.env.HF_API_KEY}` } }
     );
-
     return res.data?.[0]?.generated_text || null;
-  } catch (err) {
-    console.log("HF Error:", err.message);
-    return null;
-  }
-}
-async function geminiAI(prompt) {
-  if (!process.env.GEMINI_API_KEY) return null;
-
-  try {
-    const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }]
-      }
-    );
-
-    return res.data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-  } catch (err) {
-    console.log("Gemini Error:", err.message);
-    return null;
-  }
+  } catch (err) { console.warn("HuggingFace Error:", err.message); return null; }
 }
 
-// 🤖 GROQ
-async function groqAI(messages) {
-  if (!process.env.GROQ_API_KEY) return null;
-
-  try {
-    const res = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        model: "llama3-8b-8192",
-        messages,
-        temperature: 0.3,
-        max_tokens: 500
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    return res.data?.choices?.[0]?.message?.content || null;
-  } catch (err) {
-    console.error("Groq Error:", err.message);
-    return null;
+async function smartAI(messages) {
+  const flat = messages.map((m) => `${m.role}: ${m.content}`).join("\n");
+  const providers = [
+    { name: "OpenRouter", fn: () => openRouterAI(messages) },
+    { name: "Groq", fn: () => groqAI(messages) },
+    { name: "Gemini", fn: () => geminiAI(flat) },
+    { name: "HuggingFace", fn: () => hfAI(flat) },
+  ];
+  for (const p of providers) {
+    const reply = await p.fn();
+    if (reply) { console.log(`✅ AI: ${p.name}`); return reply; }
+    console.warn(`⚠️ ${p.name} failed`);
   }
-}
-async function smartAI(messages, promptText) {
-  // 1️⃣ Try Groq (fastest)
-  let reply = await groqAI(messages);
-  if (reply) return reply;
-
-  console.log("⚠️ Groq failed → trying Gemini");
-
-  // 2️⃣ Gemini
-  reply = await geminiAI(promptText);
-  if (reply) return reply;
-
-  console.log("⚠️ Gemini failed → trying OpenRouter");
-
-  // 3️⃣ OpenRouter
-  reply = await openRouterAI(messages);
-  if (reply) return reply;
-
-  console.log("⚠️ OpenRouter failed → trying HuggingFace");
-
-  // 4️⃣ HuggingFace
-  reply = await hfAI(promptText);
-  if (reply) return reply;
-
-  console.log("❌ All AI failed");
-
   return null;
 }
 
+// ─────────────────────────────────────────────
+// 📜 Load past chat history from DB
+// ─────────────────────────────────────────────
+async function loadDbChatHistory(dbUserId) {
+  if (!dbUserId) return { messages: [], summary: "" };
+  try {
+    const past = await ChatMessage.find({ user: dbUserId })
+      .sort({ createdAt: -1 })
+      .limit(CHAT_HISTORY_LOAD)
+      .lean();
+
+    if (!past.length) return { messages: [], summary: "" };
+
+    past.reverse(); // oldest first for AI context
+
+    const messages = past.map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
+    }));
+
+    const lines = past.map(
+      (m) => `[${new Date(m.createdAt).toLocaleDateString()}] ${m.role === "assistant" ? "Bot" : "Patient"}: ${m.content}`
+    );
+
+    return { messages, summary: lines.join("\n") };
+  } catch (err) {
+    console.warn("loadDbChatHistory error:", err.message);
+    return { messages: [], summary: "" };
+  }
+}
+
+// ─────────────────────────────────────────────
+// 🧠 Helpers
+// ─────────────────────────────────────────────
 function detectIntent(message) {
   const msg = message.toLowerCase();
-
-  const greetings = ["hi", "hello", "hey", "hii", "good morning"];
-  const casual = ["how are you", "what's up", "who are you"];
-
-  if (greetings.some(g => msg.includes(g))) return "greeting";
-  if (casual.some(c => msg.includes(c))) return "casual";
-
+  if (["hi", "hello", "hey", "hii", "good morning"].some((g) => msg.includes(g))) return "greeting";
+  if (["how are you", "what's up", "who are you"].some((c) => msg.includes(c))) return "casual";
   return "medical";
 }
-// 🧠 Extract Symptoms (AI)
+
 async function extractSymptoms(message) {
-  const res = await groqAI([
-    {
-      role: "system",
-      content: "Extract only symptoms as comma separated list."
-    },
-    {
-      role: "user",
-      content: message
-    }
-  ]);
-
-  return res?.toLowerCase().split(",").map(s => s.trim()) || [];
+  try {
+    const res = await openRouterAI([
+      { role: "system", content: "Extract only medical symptoms from the text as a comma-separated list. Return ONLY the symptoms, nothing else." },
+      { role: "user", content: message },
+    ]);
+    if (!res) return [];
+    return res.toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
+  } catch { return []; }
 }
 
-// 🧠 Severity
+const SEVERE_WORDS = ["severe", "unbearable", "continuous", "blood", "vomiting", "high fever", "chest pain"];
 function detectSeverity(message) {
-  const severeWords = [
-    "severe",
-    "unbearable",
-    "continuous",
-    "blood",
-    "vomiting",
-    "high fever",
-    "chest pain"
-  ];
-
-  return severeWords.some(w => message.includes(w)) ? "High" : "Low";
+  return SEVERE_WORDS.some((w) => message.toLowerCase().includes(w)) ? "High" : "Low";
 }
 
-// 🧠 Follow-up
-function getFollowUp(symptoms) {
-  if (symptoms.includes("fever")) {
-    return "Do you also have chills or body pain?";
+const SYMPTOM_QUESTIONS = {
+  fever: ["How high is your temperature?", "How long have you had the fever?"],
+  headache: ["Is the pain constant or does it come and go?", "Do you feel nausea or sensitivity to light?"],
+  cold: ["Do you have a runny or blocked nose?", "Do you have a sore throat?"],
+  cough: ["Is your cough dry or producing mucus?", "How many days have you had the cough?"],
+  pain: ["On a scale of 1–10, how severe is the pain?", "Is the pain in one spot or does it spread?"],
+  vomiting: ["How many times have you vomited?", "Did it start suddenly or gradually?"],
+  fatigue: ["Are you sleeping normally?", "Is the fatigue getting worse over time?"],
+  default: ["How long have you been experiencing this?", "Do you have any other symptoms?"],
+};
+
+function getRuleBasedFollowup(symptoms, message) {
+  const lower = message.toLowerCase();
+  for (const [key, questions] of Object.entries(SYMPTOM_QUESTIONS)) {
+    if (key !== "default" && (symptoms.includes(key) || lower.includes(key))) return questions;
   }
-  if (symptoms.includes("headache")) {
-    return "Is the pain constant or comes and goes?";
-  }
-  return null;
+  return SYMPTOM_QUESTIONS.default;
 }
 
-// 🧠 Local fallback
-function buildLocalResponse(predictions) {
-  if (!predictions || predictions.length === 0) return null;
-
-  return `🩺 Possible Conditions:
-${predictions.slice(0, 3).map(p => `• ${p.disease}`).join("\n")}
-
-📋 General Advice:
-• Stay hydrated
-• Take rest
-• Monitor symptoms
-
-⚠️ Consult a doctor if symptoms worsen.`;
+function buildProfileText(memProfile, userDoc) {
+  const lines = [];
+  const age = memProfile?.age || userDoc?.age;
+  const gender = memProfile?.gender || userDoc?.gender;
+  const conditions = memProfile?.conditions || userDoc?.existingMedicalConditions?.join(", ");
+  const allergies = memProfile?.allergies || userDoc?.allergies?.join(", ");
+  const medications = memProfile?.medications || userDoc?.medications?.join(", ");
+  if (age) lines.push(`Age: ${age}`);
+  if (gender) lines.push(`Gender: ${gender}`);
+  if (conditions && conditions.toLowerCase() !== "none") lines.push(`Existing conditions: ${conditions}`);
+  if (allergies && allergies.toLowerCase() !== "none") lines.push(`Allergies: ${allergies}`);
+  if (medications && medications.toLowerCase() !== "none") lines.push(`Current medications: ${medications}`);
+  return lines.length ? lines.join("\n") : "Not provided.";
 }
 
-// 🧠 MAIN LOGIC
-async function getAIReply(message, userId = "default", forcedLang = null) {
-  if (!userMemory[userId]) userMemory[userId] = [];
-
-  // If a user identity is provided, try to fetch their health profile.
-  // - For web chat: identityId is a JWT user id (Mongo ObjectId string)
-  // - For WhatsApp: identityId is `msg.from` which can be linked to a user
-
-  let userDoc = null;
-  let dbUserId = null;
-  if (userId && userId !== "default") {
-    try {
-      const intent = detectIntent(message);
-      const select = "age gender existingMedicalConditions allergies medications";
-      if (intent === "greeting") {
-        return {
-          reply: "👋 Hi! I'm your AI Health Assistant. Tell me your symptoms and I’ll help you.",
-          prediction: {
-            disease: "None",
-            risk: "Low",
-            confidence: "0.00",
-            symptomsDetected: [],
-          }
-        };
-      }
-
-      if (intent === "casual") {
-        return {
-          reply: "😊 I'm here to help with health-related questions. Tell me your symptoms.",
-          prediction: {
-            disease: "None",
-            risk: "Low",
-            confidence: "0.00",
-            symptomsDetected: [],
-          }
-        };
-      }
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-        userDoc = await User.findById(userId).select(select).lean();
-        dbUserId = userDoc?._id || userId;
-      } else {
-        userDoc = await User.findOne({ whatsappId: userId }).select(select).lean();
-        dbUserId = userDoc?._id || null;
-      }
-    } catch (err) {
-      // Never fail chat due to profile lookup issues.
-      userDoc = null;
-      dbUserId = null;
+async function resolveUser(userId) {
+  if (!userId || userId === "default") return { userDoc: null, dbUserId: null };
+  const select = "age gender existingMedicalConditions allergies medications";
+  try {
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      const userDoc = await User.findById(userId).select(select).lean();
+      return { userDoc, dbUserId: userDoc?._id ?? null };
+    } else {
+      const userDoc = await User.findOne({ whatsappId: userId }).select(select).lean();
+      return { userDoc, dbUserId: userDoc?._id ?? null };
     }
-  }
+  } catch { return { userDoc: null, dbUserId: null }; }
+}
 
-  // 🌐 Language detect
-  const lang = forcedLang || (await detectLanguage(message));
+async function persistMessages(dbUserId, userMsg, botMsg, lang) {
+  if (!dbUserId) return;
+  try {
+    await ChatMessage.create([
+      { user: dbUserId, role: "user", content: userMsg, lang: lang || "en" },
+      { user: dbUserId, role: "assistant", content: botMsg, lang: lang || "en" },
+    ]);
+  } catch (err) { console.warn("ChatMessage save failed:", err.message); }
+}
 
-  // 🔄 Translate
-  const msgEn =
-    lang === "en" ? message : await translateText(message, "en");
+// ─────────────────────────────────────────────
+// 🧠 MAIN LOGIC
+// ─────────────────────────────────────────────
+async function getAIReply(message, userId = "default", forcedLang = null) {
 
-  const lower = msgEn.toLowerCase();
-
-  // 🚨 Emergency
-  if (emergencyKeywords.some(k => lower.includes(k))) {
-    let msg =
-      "🚨 This may be a medical emergency. Please go to nearest hospital immediately.";
-    if (lang !== "en") msg = await translateText(msg, lang);
+  if (message.length > MAX_INPUT_LENGTH) {
     return {
-      reply: `${msg}\n\n⚠️ This is not medical advice.`,
-      prediction: {
-        disease: "Unknown",
-        risk: "High",
-        confidence: "0.00",
-        symptomsDetected: [],
-      },
+      reply: `⚠️ Your message is too long. Please keep it under ${MAX_INPUT_LENGTH} characters.\n\n⚠️ This is not medical advice.`,
+      prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] },
+      messageType: "error",
     };
   }
 
-  // 🧠 Extract symptoms (SAFE)
-  let symptoms = [];
-  try {
-    symptoms = await extractSymptoms(msgEn);
-  } catch {
-    symptoms = msgEn.split(" ");
+  const intent = detectIntent(message);
+  if (intent === "greeting") {
+    return {
+      reply: "👋 Hi! I'm your AI Health Assistant. Tell me your symptoms and I'll help you.",
+      prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] },
+      messageType: "greeting",
+    };
+  }
+  if (intent === "casual") {
+    return {
+      reply: "😊 I'm here to help with health-related questions. Tell me your symptoms.",
+      prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] },
+      messageType: "casual",
+    };
   }
 
-  if (!Array.isArray(symptoms)) {
-    symptoms = msgEn.split(" ");
+  const mem = initMemory(userId);
+  const { userDoc, dbUserId } = await resolveUser(userId);
+  const lang = forcedLang || (await detectLanguage(message));
+  const msgEn = lang === "en" ? message : await translateText(message, "en");
+  const lower = msgEn.toLowerCase();
+
+  if (isEmergency(lower)) {
+    let msg = "🚨 This may be a medical emergency. Please go to the nearest hospital immediately.";
+    if (lang !== "en") msg = await translateText(msg, lang);
+    return {
+      reply: `${msg}\n\n⚠️ This is not medical advice.`,
+      prediction: { disease: "Unknown", risk: "High", confidence: "0.00", symptomsDetected: [] },
+      messageType: "emergency",
+    };
   }
 
-  // 🧬 Predict diseases (SAFE)
-  let prediction = null;
-  try {
-    prediction = predictDisease(symptoms.join(" ") || msgEn);
-  } catch {
-    prediction = null;
+  // ✅ FIX: use dbHistoryLoaded flag — not history.length
+  // This means DB history loads exactly once per server session per user,
+  // regardless of whether they already have in-memory messages.
+  if (!mem.dbHistoryLoaded && dbUserId) {
+    const { messages: dbMessages, summary: dbSummary } = await loadDbChatHistory(dbUserId);
+    // Prepend DB history before any in-memory messages built this session
+    mem.history = [...dbMessages.slice(-MAX_HISTORY), ...mem.history].slice(-MAX_HISTORY);
+    mem.dbHistorySummary = dbSummary;
+    mem.dbHistoryLoaded = true;  // never reload again this server session
+    console.log(`📜 Loaded ${dbMessages.length} past messages from DB for user ${userId}`);
   }
 
-  const predictions = prediction
-    ? [
-      {
-        disease: prediction.disease,
-        score: Number(prediction.confidence) || 0,
-        risk: prediction.risk,
-      },
-    ]
-    : [{ disease: "Unknown", score: 0, risk: "Low" }];
-
-  // 🧠 Severity
-  const severity = detectSeverity(lower);
-
-  // 💾 Memory
-  userMemory[userId].push({ role: "user", content: msgEn });
-  const history = userMemory[userId].slice(-MAX_HISTORY);
-
-  // 🧠 SAFE PROMPT (NO CRASH)
-  const diseaseText = predictions
-    .slice(0, 3)
-    .map(p => `${p.disease} (${p.score})`)
-    .join("\n");
-
-  const profileLines = [];
-  if (userDoc) {
-    if (userDoc.age !== undefined && userDoc.age !== null) {
-      profileLines.push(`Age: ${userDoc.age}`);
-    }
-    if (userDoc.gender) {
-      profileLines.push(`Gender: ${userDoc.gender}`);
-    }
-    if (Array.isArray(userDoc.existingMedicalConditions) && userDoc.existingMedicalConditions.length) {
-      profileLines.push(
-        `Existing medical conditions: ${userDoc.existingMedicalConditions.join(", ")}`
-      );
-    }
-    if (Array.isArray(userDoc.allergies) && userDoc.allergies.length) {
-      profileLines.push(`Allergies: ${userDoc.allergies.join(", ")}`);
-    }
-    if (Array.isArray(userDoc.medications) && userDoc.medications.length) {
-      profileLines.push(`Medications (if provided): ${userDoc.medications.join(", ")}`);
-    }
+  // ── Skip profile if DB already has age + gender ──
+  if (dbProfileComplete(userDoc) && mem.profileStep === -1) {
+    mem.profileStep = PROFILE_QUESTIONS.length;
+    mem.stage = "followup";
   }
 
-  const profileText = profileLines.length ? profileLines.join("\n") : "Not provided.";
+  // ─────────────────────────────────────────────
+  // STAGE 1: PROFILE COLLECTION
+  // ─────────────────────────────────────────────
+  if (mem.stage === "profile" && !isProfileComplete(mem)) {
 
-  const prompt = `
-Patient profile (may be incomplete):
-${profileText}
-
-User symptoms: ${symptoms.join(", ") || msgEn}
-
-Possible conditions:
-${diseaseText}
-
-Severity: ${severity}
-
-Response structure (plain text):
-Most likely condition:
-Other possible causes:
-Precautions:
-When to seek urgent care:
-Note:
-
-Rules:
-- Use simple, clear language.
-- Do NOT claim diagnosis.
-- Do NOT prescribe medications or dosages.
-- If allergies are provided, include a safety caution about allergy triggers.
-`;
-
-  // 🤖 AI
-  let reply = null;
-  try {
-    reply = await smartAI(
-      [
-        { role: "system", content: "You are a safe medical assistant." },
-        ...history,
-        { role: "user", content: prompt }
-      ],
-      prompt
-    );
-  } catch (err) {
-    console.log("Groq failed, fallback used");
-  }
-
-  // 🔄 Fallback
-  if (!reply) {
-    const top = predictions[0]?.disease || "Unknown";
-    const others = predictions.slice(1).map(p => p.disease).filter(Boolean);
-
-    const profileSafetyLines = [];
-    if (userDoc) {
-      if (userDoc.age !== undefined && userDoc.age !== null) {
-        profileSafetyLines.push(`- Age: ${userDoc.age}`);
-      }
-      if (userDoc.gender) {
-        profileSafetyLines.push(`- Gender: ${userDoc.gender}`);
-      }
-      if (
-        Array.isArray(userDoc.existingMedicalConditions) &&
-        userDoc.existingMedicalConditions.length
-      ) {
-        profileSafetyLines.push(
-          `- Existing conditions: ${userDoc.existingMedicalConditions.join(", ")}`
-        );
-      }
-      if (Array.isArray(userDoc.allergies) && userDoc.allergies.length) {
-        profileSafetyLines.push(
-          `- Allergies: avoid allergy triggers (${userDoc.allergies.join(", ")})`
-        );
-      }
+    if (mem.profileStep === -1) {
+      mem.pendingMessage = msgEn;
+      mem.profileStep = 0;
+      const q = PROFILE_QUESTIONS[0];
+      let reply = q.question;
+      if (lang !== "en") reply = await translateText(reply, lang);
+      const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+      await persistMessages(dbUserId, message, finalReply, lang);
+      return { reply: finalReply, prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] }, messageType: "profile" };
     }
 
-    const profileSafetyText = profileSafetyLines.length
-      ? `\n\nProfile context (safety notes):\n${profileSafetyLines.join("\n")}`
+    recordProfileAnswer(mem, msgEn);
+
+    if (!isProfileComplete(mem)) {
+      const nextQ = PROFILE_QUESTIONS[mem.profileStep];
+      let reply = nextQ.question;
+      if (lang !== "en") reply = await translateText(reply, lang);
+      const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+      await persistMessages(dbUserId, message, finalReply, lang);
+      return { reply: finalReply, prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] }, messageType: "profile" };
+    }
+
+    mem.stage = "followup";
+  }
+
+  // ─────────────────────────────────────────────
+  // STAGE 2: FOLLOW-UP QUESTIONS
+  // ─────────────────────────────────────────────
+  if (mem.stage === "followup") {
+    const healthMessage = mem.pendingMessage || msgEn;
+    mem.pendingMessage = null;
+
+    const symptoms = await extractSymptoms(healthMessage);
+    const profileText = buildProfileText(mem.profile, userDoc);
+
+    const historyContext = mem.dbHistorySummary
+      ? `\n\nPast conversation history with this patient:\n${mem.dbHistorySummary}\n\nUse this history to understand recurring symptoms, previous conditions, and continuity of care.`
       : "";
 
-    reply = `Most likely condition: ${top}
-Other possible causes: ${others.length ? others.join(", ") : "Not enough information"
-      }
-Precautions:
-- Stay hydrated
-- Rest
-- Monitor symptoms
-When to seek urgent care:
-- If symptoms worsen, become severe, or emergency signs appear${profileSafetyText}`;
+    const followupPrompt = `You are a medical assistant. Your ONLY job right now is to ask 2 follow-up questions.
+
+Patient profile:
+${profileText}${historyContext}
+
+Patient complaint: "${healthMessage}"
+
+STRICT RULES — you MUST follow ALL of these:
+- Do NOT mention any disease or condition name
+- Do NOT give precautions or advice
+- Do NOT write "Most likely" or "possible causes"
+- Write ONLY 2 numbered questions
+- End with Risk level
+
+Respond in EXACTLY this format:
+1. [your first question]?
+2. [your second question]?
+
+Risk: Low`;
+
+    let reply = await smartAI([
+      { role: "system", content: followupPrompt },
+      ...mem.history.slice(-MAX_HISTORY),
+      { role: "user", content: `Patient says: ${healthMessage}` },
+    ]);
+
+    const badWords = ["most likely", "possible causes", "precaution", "flu", "cold", "infection", "diagnosis"];
+    const repliedBadly = badWords.some((w) => reply?.toLowerCase().includes(w));
+
+    if (!reply || !reply.includes("?") || repliedBadly) {
+      const [q1, q2] = getRuleBasedFollowup(symptoms, healthMessage);
+      reply = `1. ${q1}\n2. ${q2}\n\nRisk: Low`;
+    }
+
+    if (lang !== "en") reply = await translateText(reply, lang);
+
+    mem.history.push({ role: "user", content: healthMessage });
+    mem.history.push({ role: "assistant", content: reply });
+    mem.stage = "prediction";
+    mem.lastSymptoms = symptoms;
+    mem.lastHealthMessage = healthMessage;
+
+    const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+    await persistMessages(dbUserId, message, finalReply, lang);
+
+    return {
+      reply: finalReply,
+      prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: symptoms },
+      messageType: "followup",
+    };
   }
 
-  // 🤔 Follow-up
-  if (symptoms.includes("fever")) {
-    reply += "\n\n🤔 Do you also have chills or body pain?";
+  // ─────────────────────────────────────────────
+  // STAGE 3: PREDICTION
+  // ─────────────────────────────────────────────
+  if (mem.stage === "prediction") {
+    const symptoms = mem.lastSymptoms || await extractSymptoms(msgEn);
+    const originalComplaint = mem.lastHealthMessage || msgEn;
+    const profileText = buildProfileText(mem.profile, userDoc);
+
+    let prediction = null;
+    try {
+      const predInput = symptoms.length ? symptoms.join(" ") : originalComplaint;
+      prediction = predictDisease(predInput);
+    } catch { prediction = null; }
+
+    const diseaseText = prediction
+      ? `${prediction.disease} (confidence: ${prediction.confidence})`
+      : "Unknown";
+
+    const historyContext = mem.dbHistorySummary
+      ? `\n\nPast conversation history with this patient:\n${mem.dbHistorySummary}\n\nConsider this history — note any recurring symptoms, previous diagnoses, or patterns that may affect this assessment.`
+      : "";
+
+    const predictionPrompt = `You are a medical assistant giving a health assessment.
+
+Patient profile:
+${profileText}${historyContext}
+
+Original complaint: "${originalComplaint}"
+Patient's answers to follow-up questions: "${msgEn}"
+Predicted condition from symptom analysis: ${diseaseText}
+
+Write a clear health assessment. Use this structure:
+
+🔍 Most likely condition: [condition name]
+
+🔄 Other possible causes: [1-2 alternatives]
+
+✅ Precautions:
+- [precaution 1]
+- [precaution 2]
+- [precaution 3]
+
+🚨 When to seek urgent care: [1 clear line]
+
+Keep it concise. End with: Risk: Low / Medium / High`;
+
+    let reply = await smartAI([
+      { role: "system", content: predictionPrompt },
+      ...mem.history.slice(-MAX_HISTORY),
+      { role: "user", content: msgEn },
+    ]);
+
+    if (!reply) {
+      const risk = detectSeverity(originalComplaint);
+      reply = `🔍 Most likely condition: ${prediction?.disease || "Common illness"}\n\n✅ Precautions:\n- Rest and stay hydrated\n- Monitor your symptoms\n- Consult a doctor if symptoms worsen\n\n🚨 When to seek urgent care: If symptoms persist more than 3 days or worsen significantly.\n\nRisk: ${risk}`;
+    }
+
+    if (lang !== "en") reply = await translateText(reply, lang);
+
+    mem.history.push({ role: "user", content: msgEn });
+    mem.history.push({ role: "assistant", content: reply });
+    mem.stage = "done";
+
+    const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+    await persistMessages(dbUserId, message, finalReply, lang);
+
+    return {
+      reply: finalReply,
+      prediction: prediction || { disease: "Unknown", risk: "Low", confidence: "0.00", symptomsDetected: [] },
+      messageType: "prediction",
+    };
   }
 
-  // 🌐 Translate back
-  if (lang !== "en") {
-    reply = await translateText(reply, lang);
-  }
+  // ─────────────────────────────────────────────
+  // STAGE 4: DONE — reset for new symptoms, keep history
+  // ─────────────────────────────────────────────
+  mem.stage = "followup";
+  mem.history = mem.history.slice(-MAX_HISTORY); // ✅ keep context, don't wipe
+  mem.lastSymptoms = [];
+  mem.lastHealthMessage = msgEn;
+  mem.pendingMessage = null;
 
-  // 💾 Save
-  userMemory[userId].push({ role: "assistant", content: reply });
+  const symptoms = await extractSymptoms(msgEn);
+  const [q1, q2] = getRuleBasedFollowup(symptoms, msgEn);
+  let reply = `I see you have new symptoms. Let me ask a couple of questions first.\n\n1. ${q1}\n2. ${q2}\n\nRisk: Low`;
+  if (lang !== "en") reply = await translateText(reply, lang);
+
+  mem.history.push({ role: "user", content: msgEn });
+  mem.history.push({ role: "assistant", content: reply });
+  mem.stage = "prediction";
+  mem.lastSymptoms = symptoms;
 
   const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
-
-  // Persist chat history for authenticated users (and WhatsApp-linked users).
-  if (dbUserId) {
-    try {
-      await ChatMessage.create({
-        user: dbUserId,
-        role: "user",
-        content: message,
-        lang: lang || "en",
-      });
-      await ChatMessage.create({
-        user: dbUserId,
-        role: "assistant",
-        content: finalReply,
-        lang: lang || "en",
-      });
-    } catch (err) {
-      // History is optional; never break chat due to persistence errors.
-    }
-  }
+  await persistMessages(dbUserId, message, finalReply, lang);
 
   return {
     reply: finalReply,
-    prediction:
-      prediction || {
-        disease: "Unknown",
-        risk: "Low",
-        confidence: "0.00",
-        symptomsDetected: [],
-      },
+    prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: symptoms },
+    messageType: "followup",
   };
 }
-// 🌐 API
-exports.chatWithAI = async (req, res) => {
+
+// ─────────────────────────────────────────────
+// 🌐 Express route handler
+// ─────────────────────────────────────────────
+async function chatWithAI(req, res) {
   try {
     const { message, lang } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ message: "Message required" });
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ message: "Message is required and must be a string." });
     }
-
     const userId = req.user?.id || "default";
-    const { reply, prediction } = await getAIReply(message, userId, lang);
-
-    res.json({
-      reply,
-      prediction,
-      timestamp: new Date()
-    });
+    const { reply, prediction, messageType } = await getAIReply(message.trim(), userId, lang);
+    return res.json({ reply, prediction, messageType, timestamp: new Date() });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("chatWithAI error:", err);
+    return res.status(500).json({ message: "Internal server error." });
   }
-};
+}
 
-module.exports.getAIReply = getAIReply; 
+module.exports = { chatWithAI, getAIReply };

@@ -14,7 +14,7 @@ const hospitalRoutes = require("./src/routes/hospital.routes");
 
 
 // ✅ Import WhatsApp (DO NOT initialize again)
-require("./src/whatsapp/whatsapp");
+//require("./src/whatsapp/whatsapp");
 
 dotenv.config();
 const app = express();

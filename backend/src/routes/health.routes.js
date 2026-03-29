@@ -3,18 +3,22 @@ const router = express.Router();
 const {
     saveHealthData,
     getHealthHistory,
-    downloadReport
+    getHealthInsights,
+    downloadReport,
 } = require("../controllers/health.controller");
 
 const authMiddleware = require("../middleware/auth.middleware");
 
-// Save history
+// Save history (legacy / manual)
 router.post("/save", authMiddleware, saveHealthData);
 
-// Get history
+// Get full conversation-based health history (grouped by session)
 router.get("/history", authMiddleware, getHealthHistory);
 
-// Download PDF
+// AI-generated health insights from chat history
+router.get("/insights", authMiddleware, getHealthInsights);
+
+// Download PDF report with AI summary
 router.get("/report", authMiddleware, downloadReport);
 
 module.exports = router;
