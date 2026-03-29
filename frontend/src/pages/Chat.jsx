@@ -384,8 +384,12 @@ export default function Chat() {
     async function sendToBackend(userMessage, isAnalysis) {
         setLoading(true); setBotTyping(true);
         try {
+            const analysisMessage = Object.entries(answers)
+                .filter(([, v]) => v && v.toLowerCase() !== "none")
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(". ");
             const payload = isAnalysis
-                ? { type: "analysis", answers, lang: language }
+                ? { type: "analysis", message: analysisMessage, answers, lang: language }
                 : { type: "followup", message: userMessage, context: answers, lang: language };
             const res = await API.post("/api/chat", payload);
             const { reply, prediction, isProfileQuestion } = res.data;

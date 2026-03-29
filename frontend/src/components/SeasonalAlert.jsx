@@ -7,13 +7,18 @@ export default function SeasonalAlert() {
     const [visible, setVisible] = useState(true);
 
     useEffect(() => {
+        let timer;
         const fetchAlert = async () => {
-            const res = await API.get("/api/seasonal-alert");
-            setAlert(res.data);
-            const timer = setTimeout(() => setVisible(false), 5000);
-            return () => clearTimeout(timer);
+            try {
+                const res = await API.get("/api/seasonal-alert");
+                setAlert(res.data);
+                timer = setTimeout(() => setVisible(false), 5000);
+            } catch {
+                // Silently ignore — seasonal alerts are non-critical
+            }
         };
         fetchAlert();
+        return () => { if (timer) clearTimeout(timer); };
     }, []);
 
     if (!alert || !visible) return null;

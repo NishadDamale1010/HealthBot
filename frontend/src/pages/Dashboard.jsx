@@ -266,7 +266,11 @@ export default function Dashboard() {
               )}
             </div>
             <button
-              onClick={() => window.open("/api/report/download", "_blank")}
+              onClick={() => {
+                const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+                const token = localStorage.getItem("token");
+                window.open(`${base}/api/health/report?token=${token}`, "_blank");
+              }}
               style={{
                 padding: "8px 14px", borderRadius: 10, border: "none",
                 background: "linear-gradient(135deg, #8b5cf6, #0ea5e9)",

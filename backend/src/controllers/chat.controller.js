@@ -537,12 +537,28 @@ Keep it concise. End with: Risk: Low / Medium / High`;
 // ─────────────────────────────────────────────
 async function chatWithAI(req, res) {
   try {
-    const { message, lang } = req.body;
-    if (!message || typeof message !== "string") {
+    const { message, lang, type, answers, context } = req.body;
+
+    // Build a message string from intake answers when the frontend sends an analysis request
+    let resolvedMessage = message;
+    if (type === "analysis" && answers && typeof answers === "object") {
+      const parts = [];
+      if (answers.symptom) parts.push(`Main symptom: ${answers.symptom}`);
+      if (answers.duration) parts.push(`Duration: ${answers.duration}`);
+      if (answers.severity) parts.push(`Severity: ${answers.severity}`);
+      if (answers.location) parts.push(`Location: ${answers.location}`);
+      if (answers.extra && answers.extra.toLowerCase() !== "none") parts.push(`Other symptoms: ${answers.extra}`);
+      resolvedMessage = parts.join(". ") || message;
+    } else if (type === "followup" && !resolvedMessage && context) {
+      // Fallback: use context if message is missing in followup mode
+      resolvedMessage = message;
+    }
+
+    if (!resolvedMessage || typeof resolvedMessage !== "string") {
       return res.status(400).json({ message: "Message is required and must be a string." });
     }
     const userId = req.user?.id || "default";
-    const { reply, prediction, messageType } = await getAIReply(message.trim(), userId, lang);
+    const { reply, prediction, messageType } = await getAIReply(resolvedMessage.trim(), userId, lang);
     return res.json({ reply, prediction, messageType, timestamp: new Date() });
   } catch (err) {
     console.error("chatWithAI error:", err);
