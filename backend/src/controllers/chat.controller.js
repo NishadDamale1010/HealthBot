@@ -213,6 +213,17 @@ function detectSeverity(message) {
   return SEVERE_WORDS.some((w) => message.toLowerCase().includes(w)) ? "High" : "Low";
 }
 
+/**
+ * Parse "Risk: High/Medium/Low" from AI reply text and strip it.
+ * Returns { cleanReply, parsedRisk }.
+ */
+function parseAndStripRisk(reply) {
+  const riskMatch = reply.match(/\n*\s*Risk:\s*(High|Medium|Low)\s*$/i);
+  const parsedRisk = riskMatch ? riskMatch[1].charAt(0).toUpperCase() + riskMatch[1].slice(1).toLowerCase() : null;
+  const cleanReply = riskMatch ? reply.slice(0, riskMatch.index).trimEnd() : reply;
+  return { cleanReply, parsedRisk };
+}
+
 const SYMPTOM_QUESTIONS = {
   fever: ["How high is your temperature?", "How long have you had the fever?"],
   headache: ["Is the pain constant or does it come and go?", "Do you feel nausea or sensitivity to light?"],
@@ -412,6 +423,11 @@ Risk: Low`;
       reply = `1. ${q1}\n2. ${q2}\n\nRisk: Low`;
     }
 
+    // Parse and strip "Risk: ..." from reply text so the frontend badge is the single source of truth
+    const { cleanReply: followupClean, parsedRisk: followupRisk } = parseAndStripRisk(reply);
+    const resolvedFollowupRisk = followupRisk || detectSeverity(healthMessage);
+    reply = followupClean;
+
     if (lang !== "en") reply = await translateText(reply, lang);
 
     mem.history.push({ role: "user", content: healthMessage });
@@ -425,7 +441,7 @@ Risk: Low`;
 
     return {
       reply: finalReply,
-      prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: symptoms },
+      prediction: { disease: "None", risk: resolvedFollowupRisk, confidence: "0.00", symptomsDetected: symptoms },
       messageType: "followup",
     };
   }
@@ -487,6 +503,11 @@ Keep it concise. End with: Risk: Low / Medium / High`;
       reply = `🔍 Most likely condition: ${prediction?.disease || "Common illness"}\n\n✅ Precautions:\n- Rest and stay hydrated\n- Monitor your symptoms\n- Consult a doctor if symptoms worsen\n\n🚨 When to seek urgent care: If symptoms persist more than 3 days or worsen significantly.\n\nRisk: ${risk}`;
     }
 
+    // Parse and strip "Risk: ..." from reply text so the frontend badge is the single source of truth
+    const { cleanReply: predClean, parsedRisk: predRisk } = parseAndStripRisk(reply);
+    const resolvedPredRisk = predRisk || detectSeverity(originalComplaint);
+    reply = predClean;
+
     if (lang !== "en") reply = await translateText(reply, lang);
 
     mem.history.push({ role: "user", content: msgEn });
@@ -496,9 +517,14 @@ Keep it concise. End with: Risk: Low / Medium / High`;
     const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
     await persistMessages(dbUserId, message, finalReply, lang);
 
+    // Use parsed risk from AI reply (most accurate), fall back to rule-based severity
+    const predPrediction = prediction
+      ? { ...prediction, risk: resolvedPredRisk }
+      : { disease: "Unknown", risk: resolvedPredRisk, confidence: "0.00", symptomsDetected: [] };
+
     return {
       reply: finalReply,
-      prediction: prediction || { disease: "Unknown", risk: "Low", confidence: "0.00", symptomsDetected: [] },
+      prediction: predPrediction,
       messageType: "prediction",
     };
   }
@@ -514,7 +540,8 @@ Keep it concise. End with: Risk: Low / Medium / High`;
 
   const symptoms = await extractSymptoms(msgEn);
   const [q1, q2] = getRuleBasedFollowup(symptoms, msgEn);
-  let reply = `I see you have new symptoms. Let me ask a couple of questions first.\n\n1. ${q1}\n2. ${q2}\n\nRisk: Low`;
+  let reply = `I see you have new symptoms. Let me ask a couple of questions first.\n\n1. ${q1}\n2. ${q2}`;
+  const resetRisk = detectSeverity(msgEn);
   if (lang !== "en") reply = await translateText(reply, lang);
 
   mem.history.push({ role: "user", content: msgEn });
@@ -527,7 +554,7 @@ Keep it concise. End with: Risk: Low / Medium / High`;
 
   return {
     reply: finalReply,
-    prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: symptoms },
+    prediction: { disease: "None", risk: resetRisk, confidence: "0.00", symptomsDetected: symptoms },
     messageType: "followup",
   };
 }
