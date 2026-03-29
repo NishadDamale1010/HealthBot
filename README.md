@@ -59,9 +59,9 @@ Create a `.env` file inside `backend/`
 
 
 PORT=5000
-MONGO_URI=your_mongodb_connection
+MONGO_DB=your_mongodb_connection
 JWT_SECRET=your_secret_key
-OPENAI_API_KEY=your_api_key
+GROQ_API_KEY=your_groq_api_key
 
 
 ⚠️ Never push `.env` file to GitHub

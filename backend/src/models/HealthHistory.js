@@ -23,4 +23,4 @@ const healthHistorySchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model("HealthHistory", healthHistorySchema);``
+module.exports = mongoose.model("HealthHistory", healthHistorySchema);
