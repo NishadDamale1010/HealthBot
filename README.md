@@ -66,6 +66,12 @@ GROQ_API_KEY=your_groq_api_key
 
 ⚠️ Never push `.env` file to GitHub
 
+For frontend deployment, create `frontend/.env` from `frontend/.env.example` and set:
+
+```
+VITE_API_BASE_URL=https://healthbot-k1ha.onrender.com
+```
+
 ---
 
 ## ▶️ Run Project
