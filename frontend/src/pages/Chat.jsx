@@ -758,6 +758,27 @@ export default function Chat() {
                     )}
                     {/* ── Input bar ── */}
                     <div style={{
+                        borderTop: "1px solid var(--border)", padding: "10px 14px 8px",
+                        background: "var(--input-bar)", display: "flex", flexDirection: "column", gap: 8,
+                    }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                            <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+                                🖼️ Medical image upload (coming soon)
+                            </p>
+                            <button
+                                disabled
+                                style={{
+                                    border: "1px solid var(--border)", background: "var(--surface)",
+                                    color: "var(--text-body)", borderRadius: 10, padding: "8px 10px",
+                                    fontSize: 12, cursor: "not-allowed",
+                                    opacity: 0.6,
+                                }}
+                            >
+                                🖼️ Choose Image
+                            </button>
+                        </div>
+                    </div>
+                    <div style={{
                         borderTop: "1px solid var(--border)", padding: "12px 14px",
                         display: "flex", gap: 10, alignItems: "center",
                         background: "var(--input-bar)",

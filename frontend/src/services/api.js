@@ -1,7 +1,12 @@
 import axios from "axios";
 
+const DEPLOYED_BACKEND_URL = "https://healthbot-k1ha.onrender.com";
+const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? "http://localhost:5000" : DEPLOYED_BACKEND_URL);
+
 const API = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000",
+    baseURL: API_BASE_URL,
 });
 
 // 🔐 Attach token automatically
