@@ -39,11 +39,11 @@ function initMemory(userId) {
 // 📋 Profile questions
 // ─────────────────────────────────────────────
 const PROFILE_QUESTIONS = [
-  { key: "age", question: "Before I help you, I need a few quick details.\n\n1️⃣ How old are you?" },
-  { key: "gender", question: "2️⃣ What is your gender? (Male / Female / Other)" },
-  { key: "conditions", question: "3️⃣ Do you have any existing medical conditions?\n(e.g. diabetes, hypertension — or type 'None')" },
-  { key: "allergies", question: "4️⃣ Do you have any known allergies? (or type 'None')" },
-  { key: "medications", question: "5️⃣ Are you currently taking any medications? (or type 'None')" },
+  { key: "age", question: "Thanks for sharing. I’ll ask 5 quick questions so I can guide you better.\n\n1️⃣ What is your age?" },
+  { key: "gender", question: "2️⃣ What gender do you identify with? (Male / Female / Other)" },
+  { key: "conditions", question: "3️⃣ Do you have any existing medical conditions?\n(Example: diabetes, BP, asthma — or type 'None')" },
+  { key: "allergies", question: "4️⃣ Do you have any known allergies?\n(If none, type 'None')" },
+  { key: "medications", question: "5️⃣ Are you currently taking any regular medicines?\n(If none, type 'None')" },
 ];
 
 function isProfileComplete(mem) {
@@ -389,7 +389,7 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
       ? `\n\nPast conversation history with this patient:\n${mem.dbHistorySummary}\n\nUse this history to understand recurring symptoms, previous conditions, and continuity of care.`
       : "";
 
-    const followupPrompt = `You are a medical assistant. Your ONLY job right now is to ask 2 follow-up questions.
+    const followupPrompt = `You are a caring medical triage assistant. Your ONLY job right now is to ask 2 follow-up questions.
 
 Patient profile:
 ${profileText}${historyContext}
@@ -400,7 +400,8 @@ STRICT RULES — you MUST follow ALL of these:
 - Do NOT mention any disease or condition name
 - Do NOT give precautions or advice
 - Do NOT write "Most likely" or "possible causes"
-- Write ONLY 2 numbered questions
+- Keep language very simple and supportive
+- Write ONLY 2 numbered questions (one sentence each)
 - End with Risk level
 
 Respond in EXACTLY this format:
@@ -468,7 +469,7 @@ Risk: Low`;
       ? `\n\nPast conversation history with this patient:\n${mem.dbHistorySummary}\n\nConsider this history — note any recurring symptoms, previous diagnoses, or patterns that may affect this assessment.`
       : "";
 
-    const predictionPrompt = `You are a medical assistant giving a health assessment.
+    const predictionPrompt = `You are a friendly medical assistant giving a clear, user-friendly health assessment.
 
 Patient profile:
 ${profileText}${historyContext}
@@ -477,20 +478,25 @@ Original complaint: "${originalComplaint}"
 Patient's answers to follow-up questions: "${msgEn}"
 Predicted condition from symptom analysis: ${diseaseText}
 
-Write a clear health assessment. Use this structure:
+Write a simple, calm response in plain language. Use this structure exactly:
 
-🔍 Most likely condition: [condition name]
+💡 What this may be: [condition name]
 
-🔄 Other possible causes: [1-2 alternatives]
+🔄 Other possible reasons: [1-2 alternatives]
 
-✅ Precautions:
-- [precaution 1]
-- [precaution 2]
-- [precaution 3]
+✅ What you can do now:
+- [short action 1]
+- [short action 2]
+- [short action 3]
 
-🚨 When to seek urgent care: [1 clear line]
+🚨 Get urgent care now if: [1 clear line]
 
-Keep it concise. End with: Risk: Low / Medium / High`;
+Tone requirements:
+- Be empathetic and non-judgmental
+- Avoid scary wording
+- Keep it concise (max ~140 words)
+
+End with: Risk: Low / Medium / High`;
 
     let reply = await smartAI([
       { role: "system", content: predictionPrompt },
@@ -500,7 +506,7 @@ Keep it concise. End with: Risk: Low / Medium / High`;
 
     if (!reply) {
       const risk = detectSeverity(originalComplaint);
-      reply = `🔍 Most likely condition: ${prediction?.disease || "Common illness"}\n\n✅ Precautions:\n- Rest and stay hydrated\n- Monitor your symptoms\n- Consult a doctor if symptoms worsen\n\n🚨 When to seek urgent care: If symptoms persist more than 3 days or worsen significantly.\n\nRisk: ${risk}`;
+      reply = `💡 What this may be: ${prediction?.disease || "a common short-term illness"}\n\n🔄 Other possible reasons: mild viral infection, dehydration\n\n✅ What you can do now:\n- Rest and drink fluids\n- Eat light, easy-to-digest meals\n- Track your symptoms for the next 24 hours\n\n🚨 Get urgent care now if: symptoms become severe, breathing is difficult, or you feel faint.\n\nRisk: ${risk}`;
     }
 
     // Parse and strip "Risk: ..." from reply text so the frontend badge is the single source of truth
