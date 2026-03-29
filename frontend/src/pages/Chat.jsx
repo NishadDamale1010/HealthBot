@@ -421,7 +421,7 @@ export default function Chat() {
                 await delay(200);
                 await pushBotAnimated(
                     "Thanks for sharing that! I have everything I need. \u{1FA7A} " +
-                    "Tap the Analyze button below and I'll give you a detailed assessment."
+                    "Tap the Analyze button below and I'll give you a detailed assessment ..."
                 );
             }
         } else if (phase === "chat") {
