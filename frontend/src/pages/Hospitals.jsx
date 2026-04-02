@@ -177,7 +177,7 @@ export default function Hospitals() {
         : null;
 
     return (
-        <div style={{
+        <div className="hb-premium-page" style={{
             minHeight: "calc(100vh - 64px)",
             background: "linear-gradient(160deg, #fff1f2 0%, #f0f9ff 60%, #f0fdf4 100%)",
             fontFamily: "'DM Sans', sans-serif",
@@ -333,7 +333,7 @@ export default function Hospitals() {
                 }}>
 
                     {/* Hospital list */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div className="hb-premium-card" style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12 }}>
 
                         <p style={{
                             fontSize: 11, fontWeight: 600, letterSpacing: "0.07em",
@@ -424,7 +424,7 @@ export default function Hospitals() {
                     </div>
 
                     {/* Map */}
-                    <div style={{
+                    <div className="hb-premium-card" style={{
                         borderRadius: 20, overflow: "hidden",
                         border: "1px solid #e2e8f0",
                         boxShadow: "0 4px 24px rgba(0,0,0,0.07)"

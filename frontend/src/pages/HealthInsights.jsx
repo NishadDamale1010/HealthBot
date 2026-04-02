@@ -52,7 +52,7 @@ export default function HealthInsightsPreview() {
     }
 
     return (
-        <div style={{
+        <div className="hb-premium-page" style={{
             maxWidth: 800, margin: "32px auto", padding: "0 24px",
             fontFamily: "'DM Sans', sans-serif"
         }}>
@@ -73,7 +73,7 @@ export default function HealthInsightsPreview() {
 
             {/* AI Insights */}
             {insights ? (
-                <div style={{
+                <div className="hb-premium-card" style={{
                     background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0",
                     padding: "20px 24px", marginBottom: 24, whiteSpace: "pre-wrap",
                     lineHeight: 1.7, fontSize: 14, color: "#1e293b"
@@ -104,7 +104,7 @@ export default function HealthInsightsPreview() {
                                 ? new Date(session[0].createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                                 : "";
                             return (
-                                <div key={i} style={{
+                                <div key={i} className="hb-premium-card" style={{
                                     background: "#fff", borderRadius: 12,
                                     border: "1px solid #e2e8f0", padding: "12px 16px",
                                 }}>

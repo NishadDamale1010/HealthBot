@@ -173,7 +173,7 @@ export default function Dashboard() {
   }[form.gender] || "—";
 
   return (
-    <div style={{
+    <div className="hb-premium-page" style={{
       minHeight: "100vh",
       background: "linear-gradient(160deg, #e0f2fe 0%, #f0fdf4 50%, #fef9c3 100%)",
       fontFamily: "'DM Sans', sans-serif",
@@ -255,7 +255,7 @@ export default function Dashboard() {
       }}>
 
         {/* ─── Health Profile Card ─── */}
-        <div style={{
+        <div className="hb-premium-card" style={{
           background: "#fff", borderRadius: 20,
           border: "1px solid #e2e8f0", padding: "24px",
           display: "flex", flexDirection: "column", gap: 20
@@ -418,7 +418,7 @@ export default function Dashboard() {
         </div>
 
         {/* ─── Chat History Card ─── */}
-        <div style={{
+        <div className="hb-premium-card" style={{
           background: "#fff", borderRadius: 20,
           border: "1px solid #e2e8f0",
           display: "flex", flexDirection: "column",

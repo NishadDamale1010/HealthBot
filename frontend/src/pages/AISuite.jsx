@@ -95,7 +95,7 @@ export default function AISuite() {
     };
 
     return (
-        <div style={{ maxWidth: 920, margin: "24px auto", padding: "0 20px", fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="hb-premium-page" style={{ maxWidth: 920, margin: "24px auto", padding: "0 20px", fontFamily: "'DM Sans', sans-serif" }}>
             <h1 style={{ marginBottom: 8 }}>AI Health Intelligence Suite</h1>
             <p style={{ color: "#64748b", marginTop: 0 }}>Advanced features: progression simulator, risk scoring, emotion check, and lab insights.</p>
 
@@ -116,14 +116,14 @@ export default function AISuite() {
             </div>
 
             {progression && (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                <div className="hb-premium-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
                     <h3>Symptom Progression</h3>
                     {progression.timeline?.map((t) => <p key={t.day} style={{ margin: "6px 0" }}>Day {t.day}: {t.status}</p>)}
                 </div>
             )}
 
             {risk && (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                <div className="hb-premium-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
                     <h3>Personalized Health Risk Score</h3>
                     <p>Diabetes Risk: {risk.diabetesRisk.score}% ({risk.diabetesRisk.level})</p>
                     <p>Heart Risk: {risk.heartRisk.score}% ({risk.heartRisk.level})</p>
@@ -131,7 +131,7 @@ export default function AISuite() {
             )}
 
             {emotion && (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                <div className="hb-premium-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginBottom: 12 }}>
                     <h3>Mental Health Emotion Detection</h3>
                     <p>Mood: {emotion.mood}</p>
                     <p>{emotion.suggestion}</p>
@@ -139,7 +139,7 @@ export default function AISuite() {
             )}
 
             {lab && (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
+                <div className="hb-premium-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14 }}>
                     <h3>Lab Report Analyzer</h3>
                     {lab.findings?.length ? lab.findings.map((f) => <p key={f}>• {f}</p>) : <p>No abnormalities detected.</p>}
                     <p style={{ color: "#64748b" }}>{lab.summary}</p>
@@ -147,7 +147,7 @@ export default function AISuite() {
             )}
 
             {advanced && (
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginTop: 12 }}>
+                <div className="hb-premium-card" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 14, marginTop: 12 }}>
                     <h3>Advanced AI Features Bundle</h3>
                     <p><strong>Digital Twin:</strong> Fatigue risk in 5 days = {advanced.digitalTwin?.fatigueRiskIn5Days}</p>
                     <p><strong>Severity:</strong> {advanced.dynamicSeverityClassification}</p>
