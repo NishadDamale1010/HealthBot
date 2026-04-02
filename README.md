@@ -62,9 +62,20 @@ PORT=5000
 MONGO_DB=your_mongodb_connection
 JWT_SECRET=your_secret_key
 GROQ_API_KEY=your_groq_api_key
+FRONTEND_ORIGIN=https://your-frontend-domain.com
 
 
 ⚠️ Never push `.env` file to GitHub
+
+For frontend deployment, create `frontend/.env` from `frontend/.env.example` and set:
+
+```
+VITE_API_BASE_URL=https://healthbot-k1ha.onrender.com
+```
+
+`frontend/vercel.json` includes SPA rewrite rules so route refreshes like `/dashboard` or `/hospitals` do not return 404 on Vercel.
+
+Backend readiness endpoint: `GET /healthz`
 
 ---
 

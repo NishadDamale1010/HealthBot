@@ -68,7 +68,10 @@ function App() {
   }, []);
 
   // Close mobile menu on route change
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    const timer = setTimeout(() => setMenuOpen(false), 0);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
 
   const logout = () => {
     localStorage.removeItem("token");
