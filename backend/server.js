@@ -12,6 +12,7 @@ const profileRoutes = require("./src/routes/profile.routes");
 const seasonalRoutes = require("./src/routes/seasonal.routes");
 const healthRoutes = require("./src/routes/health.routes");
 const hospitalRoutes = require("./src/routes/hospital.routes");
+const intelligenceRoutes = require("./src/routes/intelligence.routes");
 
 
 // ✅ Import WhatsApp (DO NOT initialize again)
@@ -45,6 +46,16 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/seasonal-alert", seasonalRoutes);
 app.use("/api/health" ,healthRoutes)
 app.use("/api/hospitals", hospitalRoutes);
+app.use("/api/intelligence", intelligenceRoutes);
+
+app.get("/healthz", (req, res) => {
+  res.status(200).json({
+    ok: true,
+    uptimeSec: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    requestId: req.requestId,
+  });
+});
 
 app.get("/healthz", (req, res) => {
   res.status(200).json({
