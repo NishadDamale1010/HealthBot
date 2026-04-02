@@ -37,3 +37,45 @@ body {
   letter-spacing: -0.02em;
   color: var(--hb-text);
 }
+
+.hb-panel {
+  background: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(248,250,252,0.9));
+  border: 1px solid rgba(14, 165, 233, 0.15);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(2, 132, 199, 0.1);
+}
+
+.hb-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 11px 13px;
+  font-size: 14px;
+  background: #fff;
+  transition: border-color .15s, box-shadow .15s;
+}
+.hb-input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+}
+
+.hb-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  box-shadow: 0 6px 16px rgba(14,165,233,.25);
+  transition: transform .12s, opacity .12s, box-shadow .12s;
+}
+.hb-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(14,165,233,.3); }
+.hb-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.hb-btn-secondary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  box-shadow: 0 6px 16px rgba(16,185,129,.25);
+}
