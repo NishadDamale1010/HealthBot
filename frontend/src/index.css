@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+:root {
+  --hb-bg-a: #ecfdf5;
+  --hb-bg-b: #eff6ff;
+  --hb-bg-c: #f0f9ff;
+  --hb-card: rgba(255, 255, 255, 0.92);
+  --hb-border: rgba(16, 185, 129, 0.16);
+  --hb-shadow: 0 12px 34px rgba(2, 132, 199, 0.12), 0 2px 8px rgba(16, 185, 129, 0.08);
+  --hb-text: #0f172a;
+  --hb-muted: #64748b;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 10% 0%, var(--hb-bg-a) 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 90%, var(--hb-bg-b) 0%, transparent 50%),
+    linear-gradient(160deg, #f8fafc 0%, var(--hb-bg-c) 100%);
+  color: var(--hb-text);
+}
+
+.hb-premium-page {
+  min-height: calc(100vh - 64px);
+  padding: 24px 20px 40px;
+}
+
+.hb-premium-card {
+  background: var(--hb-card);
+  border: 1px solid var(--hb-border);
+  box-shadow: var(--hb-shadow);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+}
+
+.hb-premium-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--hb-text);
+}
