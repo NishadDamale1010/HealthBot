@@ -14,3 +14,10 @@ exports.predict = (req, res) => {
         allPredictions: [results]
     });
 };
+
+exports.predictFromImage = async (req, res) => {
+    return res.status(501).json({
+        message: "Medical image analysis is temporarily unavailable.",
+        placeholder: true,
+    });
+};
