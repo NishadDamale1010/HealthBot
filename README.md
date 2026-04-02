@@ -10,6 +10,8 @@ HealthBot is an AI-powered health assistant that helps users with disease awaren
 - 🔐 User Authentication (JWT based)  
 - 💬 Real-time chat interface  
 - ✨ AI Health Intelligence Suite (progression simulation, risk scoring, emotion/lab insights)  
+- 🧠 Advanced AI bundle (digital twin, adherence, recovery prediction, second opinion scaffolds)  
+- 🚀 Ultra AI bundle (continuous monitoring, triage colors, confidence score, habit correlation, rare-flag scaffolds)  
 - 📱 WhatsApp Bot Integration  
 - 📊 Dashboard (Upcoming)  
 - 🌙 Dark Mode (Planned)  

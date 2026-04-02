@@ -57,15 +57,6 @@ app.get("/healthz", (req, res) => {
   });
 });
 
-app.get("/healthz", (req, res) => {
-  res.status(200).json({
-    ok: true,
-    uptimeSec: Math.floor(process.uptime()),
-    timestamp: new Date().toISOString(),
-    requestId: req.requestId,
-  });
-});
-
 // 🏠 Root
 app.get("/", (req, res) => {
   res.send("🚀 Health AI Backend Running");

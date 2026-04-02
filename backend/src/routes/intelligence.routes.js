@@ -8,6 +8,8 @@ const {
   labAnalyzer,
   dailyCoach,
   timeline,
+  advancedInsights,
+  ultraInsights,
 } = require("../controllers/intelligence.controller");
 
 const router = express.Router();
@@ -18,6 +20,8 @@ router.post("/prescription-safety", prescriptionSafety);
 router.post("/emotion-check", emotionCheck);
 router.post("/lab-analyzer", labAnalyzer);
 router.post("/daily-coach", dailyCoach);
+router.post("/advanced-insights", advancedInsights);
+router.post("/ultra-insights", ultraInsights);
 router.get("/timeline", optionalAuth, timeline);
 
 module.exports = router;

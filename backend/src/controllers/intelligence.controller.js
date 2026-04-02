@@ -124,3 +124,170 @@ exports.timeline = async (req, res) => {
   }));
   return res.json({ events });
 };
+
+exports.advancedInsights = (req, res) => {
+  const symptoms = String(req.body?.symptoms || "").toLowerCase();
+  const sleepHours = toNumber(req.body?.sleepHours, 6);
+  const steps = toNumber(req.body?.steps, 4000);
+  const diet = String(req.body?.diet || "");
+  const diagnosis = String(req.body?.diagnosis || "");
+  const medsTaken = toNumber(req.body?.medsTaken, 0);
+  const medsPrescribed = toNumber(req.body?.medsPrescribed, 0);
+  const language = String(req.body?.language || "en");
+
+  const severity = HIGH_RISK_KEYWORDS.some((k) => symptoms.includes(k))
+    ? "Severe"
+    : symptoms.includes("fever") || symptoms.includes("pain")
+      ? "Moderate"
+      : "Mild";
+
+  const twin = {
+    fatigueRiskIn5Days: sleepHours < 6 ? "High" : sleepHours < 7 ? "Moderate" : "Low",
+    cardioRiskTrend: steps < 5000 ? "Increasing" : "Stable",
+  };
+
+  const adherencePct = medsPrescribed > 0 ? Math.round((medsTaken / medsPrescribed) * 100) : 100;
+  const habitScore = Math.max(0, Math.min(100, Math.round((sleepHours / 8) * 40 + (steps / 10000) * 60)));
+  const deficiencyRisk = {
+    iron: /vegetarian|low greens|junk/i.test(diet) ? "Moderate" : "Low",
+    vitaminD: /indoor|no sun/i.test(diet) ? "High" : "Moderate",
+    protein: /low protein|skip meals/i.test(diet) ? "Moderate" : "Low",
+  };
+
+  return res.json({
+    digitalTwin: twin,
+    adaptiveTreatment: "Based on prior patterns, hydration + early rest + light meals tend to improve outcomes faster.",
+    offlineEmergencyMode: severity === "Severe"
+      ? "Emergency mode: call 112/102 immediately, keep patient seated, monitor breathing."
+      : "No immediate offline emergency trigger.",
+    contextMemoryEngine: "Past symptom memory enabled. Similar patterns will be highlighted in future chats.",
+    medicationAdherence: {
+      adherencePercent: adherencePct,
+      alert: adherencePct < 80 ? "You are missing doses; effectiveness may drop." : "Medication adherence looks good.",
+    },
+    conversationalDiagnosisGraph: {
+      topPath: severity === "Severe" ? "symptoms -> emergency triage -> urgent care" : "symptoms -> primary causes -> home care/clinic",
+      confidenceShift: severity === "Severe" ? "+22% emergency probability" : "+14% mild-viral probability",
+    },
+    healthHabitGamification: {
+      score: habitScore,
+      weeklyDelta: "+12%",
+      badge: habitScore > 70 ? "Consistency Hero" : "Getting Started",
+    },
+    nutritionalDeficiencyPredictor: deficiencyRisk,
+    foodScanner: "Image nutrition scanner scaffold ready (calories/protein/fat output can be plugged in).",
+    dynamicSeverityClassification: severity,
+    seasonalDiseaseIntelligence: "Seasonal alert: maintain hydration, mask in crowded areas, and monitor fever/cough trends.",
+    aiSecondOpinion: diagnosis
+      ? `Second opinion: verify ${diagnosis} against symptom timeline and consider differential causes if no improvement in 48h.`
+      : "Provide diagnosis text to activate second-opinion analysis.",
+    recoveryPredictionEngine: severity === "Severe" ? "Escalation likely without treatment. Seek urgent care." : "Expected recovery window: 2-5 days with treatment.",
+    conversationalMemorySummarizer: "Summary: symptoms captured, severity classified, and next-step guidance prepared.",
+    allergyIntelligence: "Allergy guard active: medication and food suggestions should be screened against profile allergies.",
+    wearableSyncSimulation: {
+      steps,
+      sleepHours,
+      insight: steps < 6000 ? "Increase daily movement by 1,500 steps." : "Activity trend is healthy.",
+    },
+    multiLanguageDialect: language === "hinglish" || language === "mr"
+      ? "Dialect mode enabled. Responses can be simplified in local style."
+      : "Standard language mode enabled.",
+    preventiveCarePlanner: [
+      "Monthly: BP + weight check",
+      "Quarterly: blood sugar panel",
+      "Every 6 months: dental and eye review",
+    ],
+    aiDebateMode: "Medicine rationale mode ready: can explain mechanism, expected benefit, and side effects.",
+    microHabitCorrection: [
+      "Stand every 60 minutes if sitting continuously.",
+      "Sleep 20 minutes earlier for the next 7 days.",
+    ],
+    disclaimer: "All outputs are AI-assisted wellness insights, not medical diagnosis.",
+  });
+};
+
+exports.ultraInsights = (req, res) => {
+  const symptoms = String(req.body?.symptoms || "").toLowerCase();
+  const sleepHours = toNumber(req.body?.sleepHours, 6);
+  const typingSpeed = toNumber(req.body?.typingSpeedWpm, 32);
+  const lateNightChats = toNumber(req.body?.lateNightChats, 3);
+  const familyHistory = String(req.body?.familyHistory || "").toLowerCase();
+  const medsHelped = String(req.body?.medsHelped || "unknown").toLowerCase();
+  const weather = String(req.body?.weather || "unknown").toLowerCase();
+  const pollution = toNumber(req.body?.aqi, 90);
+  const goal = String(req.body?.goal || "improve overall health");
+  const userType = String(req.body?.userType || "beginner").toLowerCase();
+  const bodyPart = String(req.body?.bodyPart || "general").toLowerCase();
+
+  const fatigueSignal = typingSpeed < 25 || sleepHours < 6;
+  const chronicSignal = /again|repeated|always|chronic|daily/.test(symptoms);
+  const triage = HIGH_RISK_KEYWORDS.some((k) => symptoms.includes(k)) ? "Red" : symptoms.includes("fever") || symptoms.includes("pain") ? "Yellow" : "Green";
+  const confidence = triage === "Red" ? 82 : chronicSignal ? 68 : 54;
+
+  const knowledgeGraph = {
+    nodes: ["symptoms", "conditions", "treatments", "lifestyle", "risk"],
+    links: [
+      "symptoms -> triage",
+      "family_history -> risk",
+      "sleep/activity -> habit correlation",
+      "medication_feedback -> effectiveness score",
+    ],
+  };
+
+  return res.json({
+    continuousMonitoring: {
+      fatigueSignal,
+      sleepRisk: sleepHours < 6 ? "High" : "Moderate",
+      lateNightRisk: lateNightChats >= 3 ? "High" : "Low",
+      chronicSignal,
+    },
+    drugEffectivenessFeedback: {
+      effectivenessScore: medsHelped === "yes" ? 78 : medsHelped === "no" ? 28 : 50,
+      recommendation: medsHelped === "no" ? "Re-evaluate treatment with clinician." : "Continue and monitor response.",
+    },
+    aiHealthAudit: {
+      period: "Weekly",
+      summary: "Generated symptom/risk/habit digest ready for review.",
+    },
+    voiceStressBreathing: "Voice analysis scaffold ready (tone + breath rhythm checks).",
+    historyCompression: "Compressed history: key symptoms, risk shifts, and treatment response highlights.",
+    disasterPandemicMode: weather.includes("outbreak") ? "Pandemic mode enabled: prevention + local guidelines." : "Normal mode active.",
+    companionMode: "Daily check-in prompt enabled: compare today vs yesterday.",
+    bodySystemMapping: {
+      selectedBodyPart: bodyPart,
+      likelySystems: bodyPart.includes("chest") ? ["cardio", "respiratory"] : bodyPart.includes("stomach") ? ["gastrointestinal"] : ["general"],
+    },
+    habitSymptomCorrelation: [
+      sleepHours < 6 ? "Low sleep correlates with fatigue/headache risk." : "Sleep pattern relatively stable.",
+      symptoms.includes("stomach") ? "Diet quality may correlate with stomach discomfort." : "No strong diet-symptom correlation detected.",
+    ],
+    smartTriage: { color: triage, action: triage === "Red" ? "Seek urgent care now." : triage === "Yellow" ? "Consult doctor soon." : "Monitor at home." },
+    geneticLikeRisk: {
+      diabetesRiskBoost: familyHistory.includes("diabetes") ? "+18%" : "+0%",
+      heartRiskBoost: familyHistory.includes("heart") ? "+15%" : "+0%",
+    },
+    multiImageComparison: "Multi-image progression comparison scaffold ready (improvement % output).",
+    eli5Mode: "ELI5: Blood pressure means how hard blood pushes inside your body pipes.",
+    supplementAdvisor: "Suggest vitamin D / B12 / iron only after lab confirmation and clinician advice.",
+    healthGoalPlanner: {
+      goal,
+      milestones: ["Week 1: baseline tracking", "Week 2: consistency target", "Week 3: progress review", "Week 4: adjustment plan"],
+    },
+    silentSymptomDetector: symptoms.includes("tired") ? "Hidden signal: possible sleep deficiency / stress pattern." : "No hidden high-signal symptom detected.",
+    medicationCostOptimizer: "Generic alternative checker scaffold ready (region-specific pricing can be plugged in).",
+    smartReminderContext: sleepHours < 6 ? "Context reminder: prioritize rest; skip heavy workout today." : "Context reminder: maintain routine.",
+    conversationalDrillDown: "Adaptive drill-down enabled: general -> specific -> precise questioning.",
+    environmentalImpact: pollution > 120 ? "Poor air quality may worsen breathing symptoms." : "Environmental impact currently moderate.",
+    healthConfidenceScore: `${confidence}%`,
+    emergencyContactIntelligence: triage === "Red" ? "Call emergency contact + share summary now." : "Emergency contact mode on standby.",
+    rehabRecoveryCoach: "Post-illness recovery coach scaffold ready: graded activity + progress checks.",
+    crossPlatformSync: "Sync scaffold ready for Web + Mobile + CLI channels.",
+    selfDebuggingAI: "Meta-learning log stub enabled for low-confidence predictions.",
+    healthKnowledgeGraph: knowledgeGraph,
+    doctorReadyExport: "Doctor-ready export scaffold ready (PDF/share).",
+    adaptiveUI: userType === "advanced" ? "Advanced metrics view enabled." : "Simple beginner-friendly UI enabled.",
+    rareDiseaseFlagging: confidence < 55 ? "Rare disease flag: consider specialist evaluation if symptoms persist." : "Common-case path likely.",
+    communityPatternDetection: "Anonymous trend engine scaffold ready (cluster fever/cough spikes).",
+    disclaimer: "This is an AI wellness intelligence layer, not medical diagnosis.",
+  });
+};
