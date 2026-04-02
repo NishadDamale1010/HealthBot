@@ -1,5 +1,6 @@
 const ChatMessage = require("../models/chatMessage");
 const User = require("../models/user");
+const axios = require("axios");
 
 const HIGH_RISK_KEYWORDS = ["chest pain", "shortness of breath", "not breathing", "fainted", "stroke", "heavy bleeding"];
 const STRESS_KEYWORDS = ["stressed", "anxious", "panic", "overwhelmed", "depressed", "hopeless", "can't sleep"];
@@ -289,5 +290,96 @@ exports.ultraInsights = (req, res) => {
     rareDiseaseFlagging: confidence < 55 ? "Rare disease flag: consider specialist evaluation if symptoms persist." : "Common-case path likely.",
     communityPatternDetection: "Anonymous trend engine scaffold ready (cluster fever/cough spikes).",
     disclaimer: "This is an AI wellness intelligence layer, not medical diagnosis.",
+  });
+};
+
+exports.skinDiseaseDetect = async (req, res) => {
+  try {
+    const { imageBase64, mimeType = "image/jpeg", notes = "" } = req.body || {};
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      return res.status(400).json({ message: "imageBase64 is required" });
+    }
+    const cleaned = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+    if (!cleaned || cleaned.length < 120) {
+      return res.status(400).json({ message: "Invalid image payload" });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.json({
+        condition: "Unknown (AI key not configured)",
+        confidence: 35,
+        severity: "Moderate",
+        explanation: "Could not run visual model. Please consult dermatologist if rash/spread/itching worsens.",
+        careTips: ["Keep area clean and dry", "Avoid scratching", "Use gentle soap and avoid irritants"],
+      });
+    }
+
+    const prompt = `
+You are a dermatology triage assistant.
+Analyze this skin image and return JSON with keys:
+condition, confidence (0-100), severity (Mild/Moderate/Severe), explanation, careTips (array of 3 short tips), redFlags (array).
+Do not claim certainty. Mention this is preliminary.
+Patient notes: ${notes || "None"}
+`;
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        contents: [{
+          parts: [
+            { text: prompt.trim() },
+            { inlineData: { mimeType, data: cleaned } },
+          ],
+        }],
+      },
+      { timeout: 25000 }
+    );
+
+    const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return res.json({
+        condition: "Possible dermatitis",
+        confidence: 52,
+        severity: "Moderate",
+        explanation: "Model produced non-structured output. Treat this as preliminary and seek medical advice if persistent.",
+        careTips: ["Moisturize regularly", "Avoid new cosmetic products", "Monitor changes over 24-48h"],
+      });
+    }
+    const parsed = JSON.parse(jsonMatch[0]);
+    return res.json(parsed);
+  } catch {
+    return res.status(500).json({ message: "Skin image analysis failed" });
+  }
+};
+
+exports.labReportExplain = (req, res) => {
+  const text = String(req.body?.reportText || "").toLowerCase();
+  if (!text.trim()) {
+    return res.status(400).json({ message: "reportText is required" });
+  }
+
+  const findings = [];
+  if (/hemoglobin[^0-9]*([0-9]+(\.[0-9]+)?)/.test(text)) {
+    const hb = Number(text.match(/hemoglobin[^0-9]*([0-9]+(\.[0-9]+)?)/)?.[1]);
+    if (Number.isFinite(hb) && hb < 12) findings.push("Hemoglobin appears low, possible anemia tendency.");
+  }
+  if (/glucose[^0-9]*([0-9]+(\.[0-9]+)?)/.test(text)) {
+    const glucose = Number(text.match(/glucose[^0-9]*([0-9]+(\.[0-9]+)?)/)?.[1]);
+    if (Number.isFinite(glucose) && glucose > 100) findings.push("Glucose seems elevated; monitor sugar control.");
+  }
+  if (/vitamin d[^0-9]*([0-9]+(\.[0-9]+)?)/.test(text)) {
+    const vd = Number(text.match(/vitamin d[^0-9]*([0-9]+(\.[0-9]+)?)/)?.[1]);
+    if (Number.isFinite(vd) && vd < 20) findings.push("Vitamin D looks low; discuss supplementation with clinician.");
+  }
+
+  return res.json({
+    summary: findings.length ? "Some lab markers may need follow-up." : "No major abnormal marker detected from provided text.",
+    findings,
+    nextSteps: [
+      "Share this summary with your doctor.",
+      "Repeat test if advised and track trend over time.",
+      "Do not self-medicate based only on AI interpretation.",
+    ],
   });
 };

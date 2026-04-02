@@ -9,6 +9,10 @@ export default function AISuite() {
     const [lab, setLab] = useState(null);
     const [advanced, setAdvanced] = useState(null);
     const [ultra, setUltra] = useState(null);
+    const [skinResult, setSkinResult] = useState(null);
+    const [skinPreview, setSkinPreview] = useState("");
+    const [labText, setLabText] = useState("Hemoglobin: 10.9, Glucose: 112, Vitamin D: 17");
+    const [labExplain, setLabExplain] = useState(null);
     const [loading, setLoading] = useState(false);
 
     const runProgression = async (treated) => {
@@ -94,6 +98,42 @@ export default function AISuite() {
         }
     };
 
+    const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+
+    const onSkinImageChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) return;
+        setLoading(true);
+        try {
+            const dataUrl = await fileToDataUrl(file);
+            setSkinPreview(dataUrl);
+            const { data } = await API.post("/api/intelligence/skin-detect", {
+                imageBase64: dataUrl,
+                mimeType: file.type,
+                notes: symptoms,
+            });
+            setSkinResult(data);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const runLabExplain = async () => {
+        setLoading(true);
+        try {
+            const { data } = await API.post("/api/intelligence/lab-report-explain", { reportText: labText });
+            setLabExplain(data);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="hb-premium-page" style={{ maxWidth: 980, margin: "20px auto", padding: "0 20px", fontFamily: "'DM Sans', sans-serif" }}>
             <div className="hb-panel" style={{ padding: 18, marginBottom: 14 }}>
@@ -118,6 +158,37 @@ export default function AISuite() {
                     <button className="hb-btn hb-btn-secondary" onClick={runAdvanced} disabled={loading}>Advanced AI (16-35)</button>
                     <button className="hb-btn" onClick={runUltra} disabled={loading}>Ultra AI (36-65)</button>
                 </div>
+            </div>
+
+            <div className="hb-panel" style={{ padding: 14, marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0 }}>Skin Disease Detection (Image-based)</h3>
+                <input type="file" accept="image/*" onChange={onSkinImageChange} />
+                {skinPreview && <img src={skinPreview} alt="skin preview" style={{ marginTop: 10, width: 110, height: 110, objectFit: "cover", borderRadius: 10 }} />}
+                {skinResult && (
+                    <div style={{ marginTop: 10 }}>
+                        <p><strong>Condition:</strong> {skinResult.condition}</p>
+                        <p><strong>Confidence:</strong> {skinResult.confidence}%</p>
+                        <p><strong>Severity:</strong> {skinResult.severity}</p>
+                        <p>{skinResult.explanation}</p>
+                    </div>
+                )}
+            </div>
+
+            <div className="hb-panel" style={{ padding: 14, marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0 }}>Lab Report Explanation</h3>
+                <textarea
+                    className="hb-input"
+                    value={labText}
+                    onChange={(e) => setLabText(e.target.value)}
+                    style={{ minHeight: 90, marginBottom: 8 }}
+                />
+                <button className="hb-btn" onClick={runLabExplain} disabled={loading}>Explain Lab Report</button>
+                {labExplain && (
+                    <div style={{ marginTop: 10 }}>
+                        <p><strong>Summary:</strong> {labExplain.summary}</p>
+                        {labExplain.findings?.map((f) => <p key={f}>• {f}</p>)}
+                    </div>
+                )}
             </div>
 
             {progression && (

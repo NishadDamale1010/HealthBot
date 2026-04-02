@@ -10,6 +10,8 @@ const {
   timeline,
   advancedInsights,
   ultraInsights,
+  skinDiseaseDetect,
+  labReportExplain,
 } = require("../controllers/intelligence.controller");
 
 const router = express.Router();
@@ -22,6 +24,8 @@ router.post("/lab-analyzer", labAnalyzer);
 router.post("/daily-coach", dailyCoach);
 router.post("/advanced-insights", advancedInsights);
 router.post("/ultra-insights", ultraInsights);
+router.post("/skin-detect", skinDiseaseDetect);
+router.post("/lab-report-explain", labReportExplain);
 router.get("/timeline", optionalAuth, timeline);
 
 module.exports = router;
