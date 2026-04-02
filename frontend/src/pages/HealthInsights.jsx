@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
+import { downloadHealthReport } from "../services/reportDownload";
 
 export default function HealthInsightsPreview() {
     const [insights, setInsights] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [downloadingReport, setDownloadingReport] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -25,6 +27,18 @@ export default function HealthInsightsPreview() {
         }
         fetchData();
     }, []);
+
+    const handleDownloadReport = async () => {
+        try {
+            setError("");
+            setDownloadingReport(true);
+            await downloadHealthReport();
+        } catch {
+            setError("Unable to download report right now. Please try again.");
+        } finally {
+            setDownloadingReport(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -109,20 +123,19 @@ export default function HealthInsightsPreview() {
 
             {/* Download Report */}
             <button
-                onClick={() => {
-                    const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-                    const token = localStorage.getItem("token");
-                    window.open(`${base}/api/health/report?token=${token}`, "_blank");
-                }}
+                onClick={handleDownloadReport}
+                disabled={downloadingReport}
                 style={{
                     marginTop: 24, width: "100%", padding: "12px",
                     borderRadius: 12, border: "none",
                     background: "linear-gradient(135deg, #0ea5e9, #06b6d4)",
-                    color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                    color: "#fff", fontWeight: 600, fontSize: 14,
+                    cursor: downloadingReport ? "not-allowed" : "pointer",
+                    opacity: downloadingReport ? 0.7 : 1,
                     fontFamily: "'DM Sans', sans-serif"
                 }}
             >
-                Download Health Report (PDF)
+                {downloadingReport ? "Preparing report..." : "Download Health Report (PDF)"}
             </button>
         </div>
     );
