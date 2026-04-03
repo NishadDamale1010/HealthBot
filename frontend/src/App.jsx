@@ -78,12 +78,10 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setEmergencyMode(false);
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
   };
 
   const toggleEmergencyMode = () => {
@@ -252,6 +250,11 @@ function App() {
         .hb-mobile-menu.open { display: flex; }
 
         #hb-main { min-height: calc(100vh - 64px); }
+        .hb-route-shell { animation: hbRouteIn .35s ease both; }
+        @keyframes hbRouteIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         @media (max-width: 720px) {
           .hb-links, .hb-divider { display: none !important; }
@@ -364,17 +367,19 @@ function App() {
       </div>
 
       <main id="hb-main">
-        <Routes>
-          <Route path="/" element={<Chat />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/health" element={<HealthInsights />} />
-          <Route path="/hospitals" element={<Hospitals />} />
-          <Route path="/ai-suite" element={<AISuite />} />
-          <Route path="/ai-analysis" element={<AIAnalysis />} />
-        </Routes>
+        <div key={location.pathname} className="hb-route-shell">
+          <Routes>
+            <Route path="/" element={<Chat />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/health" element={<HealthInsights />} />
+            <Route path="/hospitals" element={<Hospitals />} />
+            <Route path="/ai-suite" element={<AISuite />} />
+            <Route path="/ai-analysis" element={<AIAnalysis />} />
+          </Routes>
+        </div>
       </main>
     </>
   );

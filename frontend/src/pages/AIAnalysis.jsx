@@ -1,104 +1,72 @@
 import { Link } from "react-router-dom";
 
-const featureCards = [
+const analysisTracks = [
   {
-    title: "Symptom Deep Analysis",
-    description: "Run progression simulations, risk scoring, and advanced diagnostic insights.",
+    title: "Symptom Intelligence",
+    description: "Run focused triage simulation and risk-first analysis from your symptom history.",
+    link: "/chat",
+    cta: "Start in Chat",
+  },
+  {
+    title: "Image-based Detection",
+    description: "Upload skin/rash images directly in chat for AI-assisted image signal checks.",
+    link: "/chat",
+    cta: "Open Image Chat",
+  },
+  {
+    title: "Advanced AI Suite",
+    description: "Open complete AI modules including progression, lab intelligence, and ultra-insights.",
+    link: "/ai-suite",
     cta: "Open AI Suite",
-    to: "/ai-suite",
   },
   {
-    title: "Image-based Skin Check",
-    description: "Upload an image for AI-assisted skin condition detection with confidence and severity.",
-    cta: "Go to Image Analysis",
-    to: "/ai-suite",
-  },
-  {
-    title: "Lab Report Intelligence",
-    description: "Paste your lab values to receive a structured summary and notable findings.",
-    cta: "Analyze Lab Report",
-    to: "/ai-suite",
-  },
-  {
-    title: "Conversation-first Guidance",
-    description: "Prefer chat? Keep using the Chat experience and switch to image workflows when needed.",
-    cta: "Open Chat",
-    to: "/chat",
+    title: "Doctor-ready Insights",
+    description: "Generate structured findings and keep analysis outcomes organized by workflow.",
+    link: "/health",
+    cta: "See Insights",
   },
 ];
 
 export default function AIAnalysis() {
   return (
-    <div className="hb-premium-page" style={{ maxWidth: 1080, margin: "24px auto", padding: "0 20px" }}>
+    <div className="hb-premium-page" style={{ maxWidth: 1080, margin: "22px auto", padding: "0 20px" }}>
       <section
         className="hb-panel"
         style={{
           padding: 22,
-          marginBottom: 18,
-          background:
-            "linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(59,130,246,0.09) 50%, rgba(14,165,233,0.09) 100%)",
-          border: "1px solid rgba(16,185,129,0.22)",
-          position: "relative",
-          overflow: "hidden",
+          marginBottom: 14,
+          background: "linear-gradient(140deg, rgba(14,165,233,.12), rgba(16,185,129,.14), rgba(15,23,42,.06))",
+          border: "1px solid rgba(14,165,233,.24)",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            right: -40,
-            top: -40,
-            width: 170,
-            height: 170,
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(59,130,246,0.2), transparent 65%)",
-            animation: "hbFloat 8s ease-in-out infinite",
-          }}
-        />
-        <p style={{ margin: 0, color: "#0f766e", fontWeight: 700, letterSpacing: 0.25 }}>AI ANALYSIS HUB</p>
-        <h1 className="hb-premium-title" style={{ margin: "8px 0 10px", fontSize: 32 }}>
-          Dedicated AI Analysis Workspace
-        </h1>
-        <p style={{ margin: 0, color: "#334155", maxWidth: 760 }}>
-          This page separates advanced analysis from regular chat so you can quickly run medical intelligence,
-          image-assisted checks, and lab-focused workflows in one premium space.
+        <p style={{ margin: 0, fontSize: 12, color: "#0369a1", fontWeight: 700, letterSpacing: ".08em" }}>DEDICATED AI ANALYSIS</p>
+        <h1 className="hb-premium-title" style={{ margin: "8px 0", fontSize: 30 }}>Power Analysis Command Center</h1>
+        <p style={{ margin: 0, color: "#334155", maxWidth: 720 }}>
+          A separate workspace for deeper diagnostics, image-assisted checks, and advanced medical AI workflows.
         </p>
       </section>
 
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-          gap: 12,
-        }}
-      >
-        {featureCards.map((card) => (
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        {analysisTracks.map((item, index) => (
           <article
-            key={card.title}
+            key={item.title}
             className="hb-panel"
             style={{
               padding: 16,
-              border: "1px solid rgba(148,163,184,0.35)",
-              transition: "transform .2s ease, box-shadow .2s ease",
-              animation: "hbCardIn .35s ease both",
+              animation: `hbTileIn .35s ease ${index * 0.05}s both`,
             }}
           >
-            <h3 style={{ marginTop: 0, marginBottom: 8 }}>{card.title}</h3>
-            <p style={{ color: "#475569", marginTop: 0 }}>{card.description}</p>
-            <Link className="hb-btn" to={card.to}>
-              {card.cta}
-            </Link>
+            <h3 style={{ marginTop: 0, marginBottom: 8, color: "#0f172a" }}>{item.title}</h3>
+            <p style={{ marginTop: 0, color: "#475569", minHeight: 64 }}>{item.description}</p>
+            <Link className="hb-btn" to={item.link}>{item.cta}</Link>
           </article>
         ))}
       </section>
 
       <style>{`
-        @keyframes hbFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(8px); }
-        }
-        @keyframes hbCardIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes hbTileIn {
+          from { opacity: 0; transform: translateY(10px) scale(.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </div>

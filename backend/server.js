@@ -22,8 +22,6 @@ dotenv.config();
 const app = express();
 app.set("trust proxy", 1);
 
-app.set("trust proxy", 1);
-
 // 🔐 Middleware
 app.disable("x-powered-by");
 const allowedOrigin = process.env.FRONTEND_ORIGIN || "*";
