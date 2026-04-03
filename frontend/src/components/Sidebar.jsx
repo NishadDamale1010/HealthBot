@@ -51,7 +51,7 @@ const advancedMenuItems = [
   { text: 'Voice Analysis', icon: <MonitorHeart />, path: '/advanced/voice-analysis' },
 ];
 
-const Sidebar = ({ open, setOpen, emergencyMode }) => {
+const Sidebar = ({ open, setOpen: _setOpen, emergencyMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
