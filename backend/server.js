@@ -88,6 +88,8 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on ${PORT}`);
+      console.log(`🏥 Basic HealthBot features loaded`);
+      console.log(`� Advanced features will be available when dependencies are installed`);
     });
 
   } catch (error) {
