@@ -22,6 +22,8 @@ dotenv.config();
 const app = express();
 app.set("trust proxy", 1);
 
+app.set("trust proxy", 1);
+
 // 🔐 Middleware
 app.disable("x-powered-by");
 const allowedOrigin = process.env.FRONTEND_ORIGIN || "*";
@@ -88,6 +90,8 @@ async function startServer() {
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on ${PORT}`);
+      console.log(`🏥 Basic HealthBot features loaded`);
+      console.log(`� Advanced features will be available when dependencies are installed`);
     });
 
   } catch (error) {

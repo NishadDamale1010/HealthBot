@@ -57,18 +57,19 @@ function NavLink({ to, icon, label, active }) {
 }
 
 function App() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const token = localStorage.getItem("token");
-  const user = (() => { try { return JSON.parse(localStorage.getItem("user")); } catch { return null; } })();
-
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [emergencyMode, setEmergencyMode] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    
+    if (token && userData) {
+      setIsAuthenticated(true);
+      setUser(JSON.parse(userData));
+    }
   }, []);
 
   // Close mobile menu on route change
@@ -77,17 +78,34 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login");
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setEmergencyMode(false);
   };
 
-  const initials = user?.name
-    ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : "?";
+  const toggleEmergencyMode = () => {
+    const newMode = !emergencyMode;
+    setEmergencyMode(newMode);
+    localStorage.setItem('emergencyMode', newMode.toString());
+  };
 
-  const visibleLinks = NAV_LINKS.filter(l => !l.authOnly || token);
+  if (!isAuthenticated) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login onLogin={handleLogin} />} />
+            <Route path="/register" element={<Register onLogin={handleLogin} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Router>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <>
