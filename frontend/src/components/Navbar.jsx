@@ -23,7 +23,7 @@ import {
   HealthAndSafety,
 } from '@mui/icons-material';
 
-const Navbar = ({ user, onLogout, emergencyMode, toggleEmergencyMode }) => {
+const Navbar = ({ user: _user, onLogout, emergencyMode, toggleEmergencyMode }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [anchorEl, setAnchorEl] = React.useState(null);
