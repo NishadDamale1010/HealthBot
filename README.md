@@ -4,82 +4,18 @@ HealthBot is an advanced AI-powered healthcare platform with 60+ cutting-edge fe
 
 ---
 
-## 🚀 Core Features (Tier 1)
+## 🚀 Features
 
-- **AI Symptom Progression Simulator** - Predicts disease progression patterns
-- **Personalized Health Risk Scoring** - Individualized risk assessment algorithms
-- **Prescription Image Scanner + Drug Safety Checker** - OCR + interaction analysis
-- **Mental Health Emotion Detection** - Sentiment analysis + psychological profiling
-- **Health Timeline Dashboard** - Visual health history tracking
-- **Smart Follow-up Question Engine** - Adaptive diagnostic questioning
-- **Nearby Medical Help Recommendation** - Context-aware location services
-- **Lab Report Analyzer** - AI-powered medical result interpretation
-- **Real-Time Emergency Detection Mode** - Critical symptom monitoring
-- **AI Health Coach** - Daily personalized wellness guidance
-- **Privacy + Data Control System** - HIPAA-compliant data management
-- **Multi-user Family Health Dashboard** - Family-wide health tracking
-- **Disease Probability Visualization** - Interactive risk charts
-- **Voice + Tone Adaptive Responses** - Emotion-aware communication
-- **"What If" Scenario Simulation** - Treatment outcome predictions
-
-## 🧠 Advanced Features (Tier 2)
-
-- **Digital Twin Health Model** - Personalized health digital replica
-- **Adaptive Treatment Recommendation Engine** - ML-based treatment suggestions
-- **Offline Emergency AI Mode** - Critical functionality without internet
-- **Long-Term Context Memory Engine** - Persistent health context tracking
-- **Medication Adherence Intelligence** - Smart compliance monitoring
-- **Conversational Diagnosis Graph** - Visual diagnostic pathways
-- **Health Habit Gamification System** - Engaging wellness challenges
-- **Nutritional Deficiency Predictor** - Dietary gap analysis
-- **Food Image Scanner with Nutrition Breakdown** - Visual calorie counting
-- **Dynamic Severity Classification System** - Real-time severity assessment
-- **Seasonal Disease Intelligence** - Environmental health predictions
-- **AI Second Opinion Mode** - Multiple diagnostic perspectives
-- **Recovery Prediction Engine** - Treatment timeline forecasting
-- **Conversation Summary Generator** - Doctor-ready reports
-- **Allergy Intelligence System** - Comprehensive allergy tracking
-
-## 🔬 Ultra-Advanced Features (Tier 3)
-
-- **Wearable Data Sync / Simulation** - IoT device integration
-- **Multi-language + Local Dialect Support** - Global accessibility
-- **Preventive Care Planner** - Proactive health scheduling
-- **Explainable AI** - Transparent treatment reasoning
-- **Micro-Habit Correction Engine** - Behavioral pattern optimization
-- **Chat Behavior-Based Health Monitoring** - Conversational health insights
-- **Drug Effectiveness Feedback Loop** - Treatment efficacy tracking
-- **AI Health Audit Reports** - Weekly/monthly health summaries
-- **Voice Stress & Breathing Analysis** - Vocal biomarker detection
-- **Medical History Compression System** - Efficient data storage
-- **Pandemic / Disaster Mode** - Emergency response protocols
-- **AI Companion Mode** - Daily wellness companion
-- **Body System Mapping Interface** - Interactive anatomy visualization
-- **Habit vs Symptom Correlation Engine** - Pattern recognition system
-- **Smart Triage System (ER-style)** - Emergency prioritization
-- **Family History-Based Risk Simulation** - Genetic risk assessment
-
-## 🚀 Next-Generation Features (Tier 4)
-
-- **Multi-image Diagnosis Comparison** - Comparative medical imaging
-- **ELI5 Medical Explanation Mode** - Simplified medical explanations
-- **Smart Supplement Advisor** - Personalized supplement recommendations
-- **AI Health Goal Planner** - Dynamic health objective setting
-- **Silent Symptom Detection** - Subtle health indicator identification
-- **Medication Cost Optimizer** - Affordable treatment options
-- **Context-Aware Smart Reminder Engine** - Intelligent notification system
-- **Conversational Drill-Down Engine** - Deep diagnostic exploration
-- **Environmental Impact Analyzer** - External health factor assessment
-- **Health Confidence Score** - Trust quantification system
-- **Emergency Contact Intelligence** - Smart emergency notification
-- **AI Recovery / Rehab Coach** - Post-treatment guidance
-- **Cross-platform Sync** - Web + Mobile + CLI integration
-- **Self-Debugging AI System** - Autonomous error correction
-- **Health Knowledge Graph Backend** - Semantic health relationships
-- **Doctor-Ready Report Export** - Professional medical documentation
-- **Adaptive UI Based on User Type** - Personalized interface design
-- **Rare Disease Detection Flag** - Uncommon condition identification
-- **Community Disease Pattern Detection** - Public health monitoring
+- 🤖 AI Chatbot for health queries  
+- 🔐 User Authentication (JWT based)  
+- 💬 Real-time chat interface  
+- ✨ AI Health Intelligence Suite (progression simulation, risk scoring, emotion/lab insights)  
+- 🧠 Advanced AI bundle (digital twin, adherence, recovery prediction, second opinion scaffolds)  
+- 🚀 Ultra AI bundle (continuous monitoring, triage colors, confidence score, habit correlation, rare-flag scaffolds)  
+- 🧪 Skin image detection + lab report explanation endpoints (AI-assisted, preliminary)  
+- 📱 WhatsApp Bot Integration  
+- 📊 Dashboard (Upcoming)  
+- 🌙 Dark Mode (Planned)  
 
 ---
 

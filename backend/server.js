@@ -14,19 +14,13 @@ const healthRoutes = require("./src/routes/health.routes");
 const hospitalRoutes = require("./src/routes/hospital.routes");
 const intelligenceRoutes = require("./src/routes/intelligence.routes");
 
-// Import basic features (commenting out advanced features temporarily)
-// const symptomProgressionSimulator = require("./src/features/symptom-progression-simulator");
-// const healthRiskScoring = require("./src/features/health-risk-scoring");
-// const prescriptionScanner = require("./src/features/prescription-scanner");
-// const mentalHealthDetector = require("./src/features/mental-health-detector");
-// const emergencyDetection = require("./src/features/emergency-detection");
-
 
 // ✅ Import WhatsApp (DO NOT initialize again)
 //require("./src/whatsapp/whatsapp");
 
 dotenv.config();
 const app = express();
+app.set("trust proxy", 1);
 
 app.set("trust proxy", 1);
 
@@ -56,29 +50,12 @@ app.use("/api/health" ,healthRoutes)
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
 
-// Advanced features will be initialized here when dependencies are installed
-// const features = {
-//   symptomProgression: symptomProgressionSimulator,
-//   healthRisk: healthRiskScoring,
-//   prescription: prescriptionScanner,
-//   mentalHealth: mentalHealthDetector,
-//   emergency: emergencyDetection
-// };
-
-// Initialize all features
-// Object.keys(features).forEach(key => {
-//   if (features[key] && typeof features[key].initialize === 'function') {
-//     features[key].initialize(app, io);
-//   }
-// });
-
 app.get("/healthz", (req, res) => {
   res.status(200).json({
     ok: true,
     uptimeSec: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     requestId: req.requestId,
-    version: "1.0.0"
   });
 });
 
