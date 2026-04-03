@@ -1,6 +1,6 @@
-# 🧠 HealthBot – AI Health Assistant
+# 🏥 HealthBot AI - Comprehensive Health Intelligence Platform
 
-HealthBot is an AI-powered health assistant that helps users with disease awareness, basic guidance, and chatbot interaction. It integrates a web app + WhatsApp bot for accessibility.
+HealthBot is an advanced AI-powered healthcare platform with 60+ cutting-edge features including symptom progression simulation, digital twin health modeling, real-time emergency detection, and multi-platform support.
 
 ---
 
@@ -22,24 +22,39 @@ HealthBot is an AI-powered health assistant that helps users with disease awaren
 ## 🛠️ Tech Stack
 
 ### Frontend
-- React (Vite)
-- Axios
-- React Router
+- **React 18** - Modern UI framework
+- **React Native** - Mobile application
+- **TensorFlow.js** - Client-side ML
+- **Chart.js + D3.js** - Advanced visualizations
+- **TailwindCSS** - Modern styling
+- **PWA** - Offline functionality
 
 ### Backend
-- Node.js
-- Express.js
-- MongoDB (Mongoose)
+- **Node.js + Express** - Server framework
+- **TensorFlow.js Node** - Server-side ML
+- **OpenCV** - Computer vision
+- **Tesseract.js** - OCR processing
+- **MongoDB + SQLite** - Multi-database approach
+- **Redis** - Caching layer
+- **Socket.io** - Real-time communication
 
-### Other Tools
-- WhatsApp Web.js
-- JWT Authentication
-- bcrypt (password hashing)
+### AI/ML Technologies
+- **Natural Language Processing** - Medical text analysis
+- **Computer Vision** - Image recognition
+- **Machine Learning** - Predictive analytics
+- **Deep Learning** - Neural network models
+- **Speech Recognition** - Voice processing
+
+### Integration & APIs
+- **WhatsApp API** - Messaging platform
+- **Google Maps API** - Location services
+- **Medical APIs** - Drug databases
+- **Emergency Services** - Alert systems
+- **Wearable APIs** - Health device integration
 
 ---
 
 ## 📁 Project Structure
-
 
 HealthBot/
 │
