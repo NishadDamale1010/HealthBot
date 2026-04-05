@@ -130,7 +130,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleDownloadReport = async () => {
+  const handleReportDownload = async () => {
     try {
       setError("");
       setDownloadingReport(true);
@@ -161,18 +161,6 @@ export default function Dashboard() {
       setHistory((prev) => [...prev, { role: "bot", content: data.reply || "I have noted that update.", createdAt: new Date().toISOString() }]);
     } catch {
       setHistory((prev) => [...prev, { role: "bot", content: "I could not process that right now. Please try again.", createdAt: new Date().toISOString() }]);
-    }
-  };
-
-  const handleDownloadReport = async () => {
-    try {
-      setError("");
-      setDownloadingReport(true);
-      await downloadHealthReport();
-    } catch {
-      setError("Unable to download report right now. Please try again.");
-    } finally {
-      setDownloadingReport(false);
     }
   };
 
@@ -218,7 +206,7 @@ export default function Dashboard() {
             <p>Health Score {healthScore}% · Risk Level {riskLevel} · AI Status Monitoring Active</p>
           </div>
           <div className="dash-hero-ctas">
-            <button className="dash-cta primary" onClick={handleDownloadReport} disabled={downloadingReport}>
+            <button className="dash-cta primary" onClick={handleReportDownload} disabled={downloadingReport}>
               {downloadingReport ? "Generating..." : "📄 Generate Report"}
             </button>
             <button className="dash-cta secondary" onClick={() => navigate("/health")}>🧠 Analyze Health</button>

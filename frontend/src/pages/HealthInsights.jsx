@@ -105,7 +105,7 @@ export default function HealthInsightsPreview() {
     });
   }, [sessions]);
 
-  const handleDownloadReport = async () => {
+  const handleReportDownloadInsights = async () => {
     try {
       setError("");
       setDownloadingReport(true);
@@ -260,7 +260,7 @@ export default function HealthInsightsPreview() {
           <article className="hi-card">
             <h2>Report Actions</h2>
             <div className="hi-cta-stack">
-              <button className="hi-btn primary" onClick={handleDownloadReport} disabled={downloadingReport}>
+              <button className="hi-btn primary" onClick={handleReportDownloadInsights} disabled={downloadingReport}>
                 {downloadingReport ? "Preparing PDF..." : "📥 Download PDF"}
               </button>
               <button className="hi-btn secondary" onClick={handleShare}>📤 Share Report</button>
