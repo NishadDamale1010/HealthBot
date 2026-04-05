@@ -9,6 +9,7 @@ import Hospitals from "./pages/Hospitals";
 import AISuite from "./pages/AISuite";
 import AIAnalysis from "./pages/AIAnalysis";
 import AIHealthCoach from "./pages/AIHealthCoach";
+import AIDiagnosticsHub from "./pages/AIDiagnosticsHub";
 
 const NAV_LINKS = [
   { to: "/chat", label: "Chat", icon: "💬" },
@@ -18,6 +19,7 @@ const NAV_LINKS = [
   { to: "/ai-suite", label: "AI Suite", icon: "✨", authOnly: true },
   { to: "/ai-analysis", label: "AI Analysis", icon: "🧪", authOnly: true },
   { to: "/ai-health-coach", label: "AI Health Coach", icon: "🥗", authOnly: true },
+  { to: "/ai-diagnostics", label: "AI Diagnostics", icon: "🔬", authOnly: true },
 ];
 
 function NavLink({ to, icon, label, active }) {
@@ -365,6 +367,7 @@ function App() {
           <Route path="/ai-suite" element={<AISuite />} />
           <Route path="/ai-analysis" element={<AIAnalysis />} />
           <Route path="/ai-health-coach" element={<AIHealthCoach />} />
+          <Route path="/ai-diagnostics" element={<AIDiagnosticsHub />} />
           </Routes>
         </div>
       </main>

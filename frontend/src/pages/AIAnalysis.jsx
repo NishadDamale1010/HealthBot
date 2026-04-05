@@ -14,6 +14,12 @@ const analysisTracks = [
     cta: "Open Image Chat",
   },
   {
+    title: "AI Diagnostics Hub",
+    description: "Use real image-based disease triage and lab report AI parsing in one premium workspace.",
+    link: "/ai-diagnostics",
+    cta: "Open Diagnostics",
+  },
+  {
     title: "Advanced AI Suite",
     description: "Open complete AI modules including progression, lab intelligence, and ultra-insights.",
     link: "/ai-suite",

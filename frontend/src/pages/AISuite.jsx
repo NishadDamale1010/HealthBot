@@ -302,8 +302,8 @@ export default function AISuite() {
             {skinPreview && <img src={skinPreview} alt="skin preview" className="ai-preview" />}
             {skinResult && (
               <div className="ai-result-box">
-                <p><strong>Condition:</strong> {skinResult.condition}</p>
-                <p><strong>Confidence:</strong> {skinResult.confidence}%</p>
+                <p><strong>Condition:</strong> {skinResult.condition || skinResult.detected_condition}</p>
+                <p><strong>Confidence:</strong> {skinResult.confidencePercent ?? Math.round((skinResult.confidence || 0) * 100)}%</p>
                 <p><strong>Severity:</strong> {skinResult.severity}</p>
               </div>
             )}
