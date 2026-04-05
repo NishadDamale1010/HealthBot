@@ -9,6 +9,10 @@ HealthBot is an AI-powered health assistant that helps users with disease awaren
 - 🤖 AI Chatbot for health queries  
 - 🔐 User Authentication (JWT based)  
 - 💬 Real-time chat interface  
+- ✨ AI Health Intelligence Suite (progression simulation, risk scoring, emotion/lab insights)  
+- 🧠 Advanced AI bundle (digital twin, adherence, recovery prediction, second opinion scaffolds)  
+- 🚀 Ultra AI bundle (continuous monitoring, triage colors, confidence score, habit correlation, rare-flag scaffolds)  
+- 🧪 Skin image detection + lab report explanation endpoints (AI-assisted, preliminary)  
 - 📱 WhatsApp Bot Integration  
 - 📊 Dashboard (Upcoming)  
 - 🌙 Dark Mode (Planned)  
@@ -62,9 +66,20 @@ PORT=5000
 MONGO_DB=your_mongodb_connection
 JWT_SECRET=your_secret_key
 GROQ_API_KEY=your_groq_api_key
+FRONTEND_ORIGIN=https://your-frontend-domain.com
 
 
 ⚠️ Never push `.env` file to GitHub
+
+For frontend deployment, create `frontend/.env` from `frontend/.env.example` and set:
+
+```
+VITE_API_BASE_URL=https://healthbot-k1ha.onrender.com
+```
+
+`frontend/vercel.json` includes SPA rewrite rules so route refreshes like `/dashboard` or `/hospitals` do not return 404 on Vercel.
+
+Backend readiness endpoint: `GET /healthz`
 
 ---
 
