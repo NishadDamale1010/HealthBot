@@ -5,24 +5,69 @@ import { downloadHealthReport } from "../services/reportDownload";
 
 const QUICK_REPLIES = ["I have fever", "Chest pain", "Headache", "Stomach pain", "Shortness of breath"];
 const SYMPTOM_KEYWORDS = ["fever", "cough", "pain", "headache", "nausea", "breath", "fatigue", "dizziness"];
+const EMERGENCY_TERMS = ["chest pain", "breathing", "shortness of breath", "unconscious", "severe bleeding", "high fever"];
+const STORAGE_KEY = "healthbot.chat.conversations.v2";
 
 const nowText = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-const createChat = () => ({
-  id: crypto.randomUUID(),
-  title: "New Conversation",
-  preview: "Start a health conversation",
-  updatedAt: new Date().toISOString(),
-  messages: [
+const createConversationState = () => ({
+  symptoms: [],
+  duration: "",
+  severity: "",
+  previousAnswers: [],
+  riskLevel: "Low",
+  lastPrediction: null,
+  messageType: "greeting",
+});
+
+const createChat = (seed = {}) => ({
+  id: seed.id || crypto.randomUUID(),
+  title: seed.title || "New Conversation",
+  preview: seed.preview || "Start a health conversation",
+  updatedAt: seed.updatedAt || new Date().toISOString(),
+  messages: seed.messages || [
     {
       role: "bot",
       text: "Hi, I’m HealthBot AI. Tell me your symptoms and I’ll guide you step by step.",
       time: nowText(),
     },
   ],
+  state: { ...createConversationState(), ...(seed.state || {}) },
 });
 
 const statusByState = (loading) => (loading ? { label: "Thinking", dot: "🟡" } : { label: "Online", dot: "🟢" });
+
+const parseConversationState = (messages, previousState = createConversationState(), incomingPrediction = null, incomingType = "") => {
+  const combined = messages.map((m) => m.text.toLowerCase()).join(" ");
+  const symptoms = SYMPTOM_KEYWORDS.filter((k) => combined.includes(k));
+
+  const durationMatch = combined.match(/(\d+\s*(day|days|week|weeks|month|months)|since\s+\w+)/i);
+  const severityMatch = combined.match(/\b(mild|moderate|high|severe|unbearable|low)\b/i);
+
+  const previousAnswers = messages
+    .filter((m) => m.role === "user")
+    .slice(-6)
+    .map((m) => m.text);
+
+  return {
+    ...previousState,
+    symptoms,
+    duration: durationMatch?.[0] || previousState.duration,
+    severity: severityMatch?.[0] || previousState.severity,
+    previousAnswers,
+    riskLevel: incomingPrediction?.risk || previousState.riskLevel || "Low",
+    lastPrediction: incomingPrediction || previousState.lastPrediction || null,
+    messageType: incomingType || previousState.messageType || "followup",
+  };
+};
+
+const buildEmergencyReason = (text, prediction) => {
+  const lower = String(text || "").toLowerCase();
+  if (prediction?.risk?.toLowerCase?.() === "high") return "AI marked this case as high risk.";
+  const matched = EMERGENCY_TERMS.find((term) => lower.includes(term));
+  if (matched) return `Detected emergency symptom: ${matched}.`;
+  return "Potential emergency pattern detected.";
+};
 
 export default function Chat() {
   const [conversations, setConversations] = useState([createChat()]);
@@ -31,19 +76,84 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [imagePreview, setImagePreview] = useState("");
   const [imageAnalyzing, setImageAnalyzing] = useState(false);
   const [aiMode, setAiMode] = useState("balanced");
   const [alert, setAlert] = useState("");
+  const [emergencyAlert, setEmergencyAlert] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [listening, setListening] = useState(false);
+  const [timelineLoading, setTimelineLoading] = useState(false);
 
   const fileInputRef = useRef(null);
   const listEndRef = useRef(null);
+  const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || !parsed.length) return;
+      const restored = parsed.map((chat) => createChat(chat));
+      setConversations(restored);
+      setActiveId(restored[0]?.id || null);
+      console.log("[Chat] restored conversations from local storage", restored.length);
+    } catch (err) {
+      console.warn("[Chat] could not restore local chat history", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  }, [conversations]);
+
+  useEffect(() => {
+    const loadTimeline = async () => {
+      setTimelineLoading(true);
+      try {
+        const { data } = await API.get("/api/intelligence/timeline");
+        const events = data?.events || [];
+        if (!events.length) return;
+        setConversations((prev) => {
+          if (prev.some((c) => c.source === "timeline")) return prev;
+          const grouped = events.slice(0, 4).map((evt, idx) => ({
+            id: `timeline-${idx}-${evt.at}`,
+            title: evt.text?.slice(0, 26) || "Past chat",
+            preview: evt.text?.slice(0, 56) || "Recovered from timeline",
+            updatedAt: evt.at || new Date().toISOString(),
+            source: "timeline",
+            messages: [{ role: evt.role === "assistant" ? "bot" : "user", text: evt.text, time: nowText() }],
+            state: createConversationState(),
+          }));
+          console.log("[Chat] timeline history fetched", grouped.length);
+          return [...prev, ...grouped];
+        });
+      } catch (err) {
+        console.warn("[Chat] timeline unavailable", err?.response?.status || err?.message);
+      } finally {
+        setTimelineLoading(false);
+      }
+    };
+
+    loadTimeline();
+  }, []);
 
   useEffect(() => {
     if (!activeId && conversations[0]) setActiveId(conversations[0].id);
   }, [activeId, conversations]);
+
+  useEffect(() => {
+    const onClickOutside = (e) => {
+      if (!mobileSidebarOpen) return;
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
+        setMobileSidebarOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [mobileSidebarOpen]);
 
   const activeChat = useMemo(
     () => conversations.find((c) => c.id === activeId) || conversations[0],
@@ -61,15 +171,17 @@ export default function Chat() {
     return SYMPTOM_KEYWORDS.filter((k) => text.includes(k)).slice(0, 5);
   }, [messages]);
 
-  const riskPercent = Math.min(95, 20 + detectedSymptoms.length * 12 + (messages.length > 8 ? 10 : 0));
-  const riskLabel = riskPercent >= 70 ? "High" : riskPercent >= 40 ? "Medium" : "Low";
-  const aiConfidence = Math.min(98, 68 + detectedSymptoms.length * 6);
+  const riskLabel = activeChat?.state?.riskLevel || "Low";
+  const riskPercent = riskLabel === "High" ? 84 : riskLabel === "Medium" ? 56 : 28;
+  const aiConfidence = activeChat?.state?.lastPrediction?.confidence
+    ? Number.parseFloat(activeChat.state.lastPrediction.confidence) * 100
+    : Math.min(98, 68 + detectedSymptoms.length * 6);
 
   const updateConversation = (chatId, updater) => {
     setConversations((prev) => prev.map((c) => (c.id === chatId ? updater(c) : c)));
   };
 
-  const addMessage = (chatId, message) => {
+  const addMessage = (chatId, message, meta = {}) => {
     updateConversation(chatId, (chat) => {
       const next = [...chat.messages, message];
       const firstUser = next.find((m) => m.role === "user")?.text || "New Conversation";
@@ -77,27 +189,68 @@ export default function Chat() {
         ...chat,
         messages: next,
         title: firstUser.slice(0, 32),
-        preview: message.text.slice(0, 48),
+        preview: message.text.slice(0, 58),
         updatedAt: new Date().toISOString(),
+        state: parseConversationState(next, chat.state, meta.prediction, meta.messageType),
       };
     });
   };
 
-  const sendMessage = async (text) => {
-    if (!text.trim() || !activeChat) return;
+  const maybeTriggerEmergency = ({ botReply, prediction, messageType }) => {
+    const highRisk = String(prediction?.risk || "").toLowerCase() === "high";
+    const emergencyType = String(messageType || "").toLowerCase() === "emergency";
+    const containsEmergencySignal = EMERGENCY_TERMS.some((term) => String(botReply).toLowerCase().includes(term));
+
+    if (highRisk || emergencyType || containsEmergencySignal) {
+      setEmergencyAlert({
+        title: "Emergency Alert",
+        reason: buildEmergencyReason(botReply, prediction),
+      });
+      if (typeof window !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    }
+  };
+
+  const sendMessage = async (text, overrides = {}) => {
+    if (!text.trim() || !activeChat || loading) return;
+
     const userText = text.trim();
     setInput("");
     addMessage(activeChat.id, { role: "user", text: userText, time: nowText() });
     setLoading(true);
+
+    const historyPayload = [...(activeChat.messages || []), { role: "user", text: userText }]
+      .slice(-12)
+      .map((m) => ({ role: m.role === "bot" ? "assistant" : "user", content: m.text }));
+
+    const contextState = {
+      ...(activeChat.state || createConversationState()),
+      history: historyPayload,
+      aiMode,
+      detectedSymptoms,
+      ...(overrides.context || {}),
+    };
+
     try {
+      console.log("[Chat] sending request", { type: overrides.type || "followup", history: historyPayload.length, contextState });
       const { data } = await API.post("/api/chat", {
-        type: "followup",
+        type: overrides.type || "followup",
         message: userText,
-        context: { aiMode, detectedSymptoms },
+        context: contextState,
       });
-      addMessage(activeChat.id, { role: "bot", text: data.reply || "I’m here to help.", time: nowText() });
-    } catch {
+
+      const reply = data?.reply || "I’m here to help.";
+      const prediction = data?.prediction || null;
+      const messageType = data?.messageType || "followup";
+
+      addMessage(activeChat.id, { role: "bot", text: reply, time: nowText() }, { prediction, messageType });
+      maybeTriggerEmergency({ botReply: reply, prediction, messageType });
+    } catch (err) {
+      console.error("[Chat] request failed", err);
       addMessage(activeChat.id, { role: "bot", text: "Server is busy. Please try again.", time: nowText() });
+      setAlert("Unable to reach AI service. Please retry.");
+      setTimeout(() => setAlert(""), 2200);
     } finally {
       setLoading(false);
     }
@@ -121,6 +274,7 @@ export default function Chat() {
     const chat = createChat();
     setConversations((prev) => [chat, ...prev]);
     setActiveId(chat.id);
+    setMobileSidebarOpen(false);
   };
 
   const fileToBase64 = (file) => new Promise((resolve, reject) => {
@@ -132,13 +286,17 @@ export default function Chat() {
 
   const handleImageFile = async (file) => {
     if (!file || !file.type?.startsWith("image/")) return;
+    if (!activeChat || imageAnalyzing) return;
+
     setImageAnalyzing(true);
     const dataUrl = await fileToBase64(file);
     setImagePreview(dataUrl);
     addMessage(activeChat.id, { role: "user", text: `📎 Uploaded image: ${file.name}`, time: nowText() });
     try {
       const { data } = await API.post("/api/predict/image", { imageBase64: dataUrl, mimeType: file.type });
-      addMessage(activeChat.id, { role: "bot", text: data.message || "Image analyzed.", time: nowText() });
+      const responseMessage = data.message || "Image analyzed.";
+      addMessage(activeChat.id, { role: "bot", text: responseMessage, time: nowText() });
+      maybeTriggerEmergency({ botReply: responseMessage, prediction: data?.prediction, messageType: data?.messageType });
     } catch {
       addMessage(activeChat.id, { role: "bot", text: "Image analysis failed.", time: nowText() });
     } finally {
@@ -166,15 +324,41 @@ export default function Chat() {
   return (
     <div className={`chat2-page ${darkMode ? "dark" : ""}`}>
       <SeasonalAlert />
+
+      {mobileSidebarOpen && <div className="chat2-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />}
+
       {alert && <div className="chat2-alert">{alert}</div>}
-      <aside className={`chat2-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+
+      {emergencyAlert && (
+        <div className="chat2-emergency-modal-backdrop" role="presentation" onClick={() => setEmergencyAlert(null)}>
+          <div className="chat2-emergency-modal" role="alertdialog" onClick={(e) => e.stopPropagation()}>
+            <h3>🚨 {emergencyAlert.title}</h3>
+            <p>{emergencyAlert.reason}</p>
+            <p>Please seek urgent medical care or contact local emergency services now.</p>
+            <button onClick={() => setEmergencyAlert(null)}>I understand</button>
+          </div>
+        </div>
+      )}
+
+      <aside
+        ref={sidebarRef}
+        className={`chat2-sidebar ${sidebarCollapsed ? "collapsed" : ""} ${mobileSidebarOpen ? "mobile-open" : ""}`}
+      >
         <div className="chat2-sidebar-head">
           <button className="chat2-new" onClick={handleNewChat}>+ New Chat</button>
           <button className="chat2-collapse" onClick={() => setSidebarCollapsed((s) => !s)}>{sidebarCollapsed ? "➡️" : "⬅️"}</button>
         </div>
         <div className="chat2-history">
+          {timelineLoading && <div className="chat2-history-loading">Syncing previous chats…</div>}
           {conversations.map((chat) => (
-            <button key={chat.id} className={`chat2-history-item ${chat.id === activeChat?.id ? "active" : ""}`} onClick={() => setActiveId(chat.id)}>
+            <button
+              key={chat.id}
+              className={`chat2-history-item ${chat.id === activeChat?.id ? "active" : ""}`}
+              onClick={() => {
+                setActiveId(chat.id);
+                setMobileSidebarOpen(false);
+              }}
+            >
               <strong>{chat.title}</strong>
               <span>{chat.preview}</span>
               <small>{new Date(chat.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small>
@@ -187,6 +371,7 @@ export default function Chat() {
         <header className="chat2-topbar">
           <div className="chat2-status">{status.dot} AI {status.label}</div>
           <div className="chat2-top-actions">
+            <button className="chat2-mobile-menu" onClick={() => setMobileSidebarOpen((s) => !s)}>☰</button>
             <button onClick={() => setDarkMode((s) => !s)}>{darkMode ? "☀️" : "🌙"}</button>
             <div className="chat2-user">N</div>
           </div>
@@ -222,18 +407,18 @@ export default function Chat() {
               {detectedSymptoms.length ? detectedSymptoms.map((s) => <span key={s}>{s}</span>) : <span>none yet</span>}
             </div>
             <div className="chat2-meter"><label>Risk Level ({riskLabel})</label><div><span style={{ width: `${riskPercent}%` }} /></div></div>
-            <div className="chat2-meter"><label>AI Confidence</label><div><span style={{ width: `${aiConfidence}%` }} /></div></div>
+            <div className="chat2-meter"><label>AI Confidence</label><div><span style={{ width: `${Math.max(8, Math.min(100, aiConfidence))}%` }} /></div></div>
             <div className="chat2-smart-actions">
-              <button onClick={() => runSmartAction("summary")}>Summarize</button>
-              <button onClick={() => runSmartAction("predict")}>Predict Risk</button>
-              <button onClick={() => runSmartAction("followup")}>Follow-up</button>
-              <button onClick={() => runSmartAction("report")}>Generate Report</button>
+              <button onClick={() => runSmartAction("summary")} disabled={loading}>Summarize</button>
+              <button onClick={() => runSmartAction("predict")} disabled={loading}>Predict Risk</button>
+              <button onClick={() => runSmartAction("followup")} disabled={loading}>Follow-up</button>
+              <button onClick={() => runSmartAction("report")} disabled={loading}>Generate Report</button>
             </div>
           </aside>
         </div>
 
         <div className="chat2-suggestions">
-          {QUICK_REPLIES.map((q) => <button key={q} onClick={() => sendMessage(q)}>{q}</button>)}
+          {QUICK_REPLIES.map((q) => <button key={q} onClick={() => sendMessage(q)} disabled={loading}>{q}</button>)}
         </div>
 
         <div
@@ -254,11 +439,12 @@ export default function Chat() {
           <button onClick={() => setAiMode((m) => (m === "balanced" ? "deep" : "balanced"))}>🧠 {aiMode}</button>
           <input
             value={input}
+            disabled={loading}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask HealthBot anything about your symptoms..."
             onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
           />
-          <button className="send" onClick={() => sendMessage(input)}>➤</button>
+          <button className="send" disabled={loading} onClick={() => sendMessage(input)}>{loading ? "…" : "➤"}</button>
         </footer>
       </section>
     </div>
