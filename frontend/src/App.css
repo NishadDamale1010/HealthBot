@@ -666,6 +666,9 @@
   place-items: center;
   animation: hiPulse 2.4s ease-in-out infinite;
 }
+.hi-chip.low { background: rgba(34, 197, 94, 0.14); border-color: rgba(21, 128, 61, 0.25); }
+.hi-chip.medium { background: rgba(245, 158, 11, 0.15); border-color: rgba(180, 83, 9, 0.2); }
+.hi-chip.high { background: rgba(239, 68, 68, 0.16); border-color: rgba(185, 28, 28, 0.2); }
 
 .hi-gauge-inner {
   width: 100px;
@@ -676,6 +679,9 @@
   place-items: center;
   text-align: center;
 }
+.hi-chip.low { background: rgba(34, 197, 94, 0.14); border-color: rgba(21, 128, 61, 0.25); }
+.hi-chip.medium { background: rgba(245, 158, 11, 0.15); border-color: rgba(180, 83, 9, 0.2); }
+.hi-chip.high { background: rgba(239, 68, 68, 0.16); border-color: rgba(185, 28, 28, 0.2); }
 
 .hi-page.dark .hi-gauge-inner { background: rgba(15, 23, 42, 0.85); }
 .hi-gauge-inner strong { font-size: 22px; }
@@ -698,6 +704,7 @@
   background: rgba(248, 250, 252, 0.7);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.hi-check-item.done { opacity: 0.65; text-decoration: line-through; }
 
 .hi-chat-item:hover { transform: translateX(2px); box-shadow: 0 10px 16px rgba(15, 23, 42, 0.08); }
 .hi-user-msg, .hi-ai-msg { margin: 0 0 6px; font-size: 13px; line-height: 1.5; }
@@ -777,6 +784,8 @@
     #0b1220;
   color: #e2e8f0;
 }
+.hi-skel-xl { height: 140px; }
+.hi-skel-grid { height: 220px; }
 
 .dash-loading {
   min-height: 100vh;
@@ -1241,6 +1250,7 @@
   border-radius: 10px;
   padding: 9px 10px;
   cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
 
 .chat2-new {
@@ -1321,6 +1331,8 @@
   gap: 10px;
   min-height: 0;
 }
+.chat2-msg.user { justify-content: flex-end; }
+.chat2-msg.user .chat2-avatar { order: 2; }
 
 .chat2-thread {
   padding: 14px;
@@ -1364,6 +1376,9 @@
   border: none;
   box-shadow: 0 12px 25px rgba(22, 163, 74, 0.25);
 }
+.chat2-upload-zone.drag { border-color: #16a34a; background: rgba(22,163,74,.08); box-shadow: 0 0 0 4px rgba(22,163,74,.12); }
+.chat2-upload-zone p { margin: 0; font-size: 13px; color: #64748b; }
+.chat2-upload-zone img { max-height: 120px; border-radius: 10px; border: 1px solid rgba(148,163,184,.3); }
 
 .chat2-bubble p { margin: 0 0 4px; line-height: 1.5; }
 .chat2-bubble small { font-size: 11px; opacity: .75; }
