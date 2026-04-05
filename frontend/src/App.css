@@ -657,6 +657,9 @@
   align-items: center;
   margin-bottom: 12px;
 }
+.hi-chip.low { background: rgba(34, 197, 94, 0.14); border-color: rgba(21, 128, 61, 0.25); }
+.hi-chip.medium { background: rgba(245, 158, 11, 0.15); border-color: rgba(180, 83, 9, 0.2); }
+.hi-chip.high { background: rgba(239, 68, 68, 0.16); border-color: rgba(185, 28, 28, 0.2); }
 
 .hi-gauge {
   width: 140px;
@@ -666,6 +669,7 @@
   place-items: center;
   animation: hiPulse 2.4s ease-in-out infinite;
 }
+.hi-check-item.done { opacity: 0.65; text-decoration: line-through; }
 
 .hi-gauge-inner {
   width: 100px;
@@ -758,6 +762,8 @@
     align-items: flex-start;
   }
 }
+.hi-skel-xl { height: 140px; }
+.hi-skel-grid { height: 220px; }
 
 /* Futuristic Dashboard redesign */
 .dash-page {
@@ -1319,6 +1325,8 @@
   border: none;
   box-shadow: 0 12px 25px rgba(22, 163, 74, 0.25);
 }
+.chat2-msg.user { justify-content: flex-end; }
+.chat2-msg.user .chat2-avatar { order: 2; }
 
 .chat2-bubble p { margin: 0 0 4px; line-height: 1.5; }
 .chat2-bubble small { font-size: 11px; opacity: .75; }
