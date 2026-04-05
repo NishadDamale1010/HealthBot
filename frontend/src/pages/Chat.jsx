@@ -328,7 +328,7 @@ export default function Chat() {
   const status = statusByState(loading);
 
   return (
-    <div className={`chat2-page ${darkMode ? "dark" : ""}`}>
+    <div className={`chat2-page ${darkMode ? "dark" : ""} ${sidebarCollapsed ? "sidebar-closed" : ""}`}>
       <SeasonalAlert />
 
       {mobileSidebarOpen && <div className="chat2-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />}
