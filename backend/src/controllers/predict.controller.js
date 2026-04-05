@@ -14,3 +14,11 @@ exports.predict = (req, res) => {
         allPredictions: [results]
     });
 };
+
+exports.predictFromImage = async (req, res) => {
+    return res.json({
+        message: "Image received. Preliminary AI image detection is in beta and should be clinically verified.",
+        placeholder: true,
+        confidence: null,
+    });
+};
