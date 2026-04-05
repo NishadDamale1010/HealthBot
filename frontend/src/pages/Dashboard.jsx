@@ -164,6 +164,18 @@ export default function Dashboard() {
     }
   };
 
+  const handleDownloadReport = async () => {
+    try {
+      setError("");
+      setDownloadingReport(true);
+      await downloadHealthReport();
+    } catch {
+      setError("Unable to download report right now. Please try again.");
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="dash-loading">
