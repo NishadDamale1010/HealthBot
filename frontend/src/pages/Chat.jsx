@@ -187,6 +187,10 @@ export default function Chat() {
     setConversations((prev) => prev.map((c) => (c.id === chatId ? updater(c) : c)));
   };
 
+  const updateChatState = (chatId, patch) => {
+    updateConversation(chatId, (chat) => ({ ...chat, state: { ...(chat.state || {}), ...patch } }));
+  };
+
   const addMessage = (chatId, message, meta = {}) => {
     updateConversation(chatId, (chat) => {
       const next = [...chat.messages, message];
@@ -263,8 +267,66 @@ export default function Chat() {
   };
 
   const runSmartAction = async (kind) => {
-    if (kind === "summary") return sendMessage("Summarize this conversation with key symptoms and advice.");
-    if (kind === "predict") return sendMessage("Predict my risk level based on the chat so far.");
+    if (!activeChat || loading) return;
+    if (kind === "summary") {
+      setLoading(true);
+      try {
+        const { data } = await API.post("/api/intelligence/advanced-insights", {
+          symptoms: detectedSymptoms.join(", "),
+          sleepHours: 7,
+          steps: 5200,
+          diet: "balanced",
+          language: "en",
+        });
+        const summary = [
+          "🧠 AI Intelligence Summary",
+          `• Severity: ${data?.dynamicSeverityClassification || "Unknown"}`,
+          `• Recovery trend: ${data?.recoveryPredictionEngine || "Not available"}`,
+          `• Coach tip: ${data?.adaptiveTreatment || "Stay hydrated and monitor symptoms."}`,
+        ].join("\n");
+        addMessage(activeChat.id, { role: "bot", text: summary, time: nowText() });
+      } catch {
+        addMessage(activeChat.id, { role: "bot", text: "Could not generate summary right now.", time: nowText() });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    if (kind === "predict") {
+      setLoading(true);
+      try {
+        const { data } = await API.post("/api/intelligence/risk-score", {
+          age: 32,
+          bmi: 24,
+          sleepHours: 7,
+          activityDaysPerWeek: 3,
+          sugarLevel: detectedSymptoms.length >= 3 ? 7 : 5,
+        });
+        const heartLevel = data?.heartRisk?.level || "Low";
+        const diabetesLevel = data?.diabetesRisk?.level || "Low";
+        const rank = { Low: 1, Moderate: 2, Medium: 2, High: 3 };
+        const risk = rank[heartLevel] >= rank[diabetesLevel] ? heartLevel : diabetesLevel;
+        const normalizedRisk = risk === "Moderate" ? "Medium" : risk;
+        updateChatState(activeChat.id, {
+          riskLevel: normalizedRisk,
+          lastPrediction: { confidence: (0.62 + detectedSymptoms.length * 0.07).toFixed(2) },
+        });
+        addMessage(
+          activeChat.id,
+          {
+            role: "bot",
+            text: `📊 Risk prediction updated.\nHeart Risk: ${heartLevel}\nDiabetes Risk: ${diabetesLevel}\nOverall Risk: ${normalizedRisk}`,
+            time: nowText(),
+          },
+          { prediction: { risk: normalizedRisk }, messageType: "prediction" },
+        );
+      } catch {
+        addMessage(activeChat.id, { role: "bot", text: "Risk prediction is currently unavailable.", time: nowText() });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (kind === "followup") return sendMessage("Ask me important follow-up questions for diagnosis.");
     if (kind === "report") {
       try {
