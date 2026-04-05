@@ -8,6 +8,7 @@ import HealthInsights from "./pages/HealthInsights";
 import Hospitals from "./pages/Hospitals";
 import AISuite from "./pages/AISuite";
 import AIAnalysis from "./pages/AIAnalysis";
+import AIHealthCoach from "./pages/AIHealthCoach";
 
 const NAV_LINKS = [
   { to: "/chat", label: "Chat", icon: "💬" },
@@ -16,6 +17,7 @@ const NAV_LINKS = [
   { to: "/health", label: "Health Insights", icon: "🧠", authOnly: true },
   { to: "/ai-suite", label: "AI Suite", icon: "✨", authOnly: true },
   { to: "/ai-analysis", label: "AI Analysis", icon: "🧪", authOnly: true },
+  { to: "/ai-health-coach", label: "AI Health Coach", icon: "🥗", authOnly: true },
 ];
 
 function NavLink({ to, icon, label, active }) {
@@ -360,8 +362,9 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/health" element={<HealthInsights />} />
             <Route path="/hospitals" element={<Hospitals />} />
-            <Route path="/ai-suite" element={<AISuite />} />
-            <Route path="/ai-analysis" element={<AIAnalysis />} />
+          <Route path="/ai-suite" element={<AISuite />} />
+          <Route path="/ai-analysis" element={<AIAnalysis />} />
+          <Route path="/ai-health-coach" element={<AIHealthCoach />} />
           </Routes>
         </div>
       </main>
