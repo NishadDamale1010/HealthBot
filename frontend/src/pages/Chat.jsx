@@ -155,6 +155,12 @@ export default function Chat() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [mobileSidebarOpen]);
 
+  useEffect(() => {
+    if (!emergencyAlert) return undefined;
+    const timer = setTimeout(() => setEmergencyAlert(null), 6500);
+    return () => clearTimeout(timer);
+  }, [emergencyAlert]);
+
   const activeChat = useMemo(
     () => conversations.find((c) => c.id === activeId) || conversations[0],
     [conversations, activeId],
@@ -327,16 +333,21 @@ export default function Chat() {
 
       {mobileSidebarOpen && <div className="chat2-sidebar-overlay" onClick={() => setMobileSidebarOpen(false)} />}
 
-      {alert && <div className="chat2-alert">{alert}</div>}
+      {alert && (
+        <div className="chat2-alert" role="status">
+          <span>⚠️ {alert}</span>
+          <button onClick={() => setAlert("")}>✕</button>
+        </div>
+      )}
 
       {emergencyAlert && (
-        <div className="chat2-emergency-modal-backdrop" role="presentation" onClick={() => setEmergencyAlert(null)}>
-          <div className="chat2-emergency-modal" role="alertdialog" onClick={(e) => e.stopPropagation()}>
-            <h3>🚨 {emergencyAlert.title}</h3>
+        <div className="chat2-emergency-toast" role="alert">
+          <div>
+            <strong>⚠️ {emergencyAlert.title}</strong>
             <p>{emergencyAlert.reason}</p>
-            <p>Please seek urgent medical care or contact local emergency services now.</p>
-            <button onClick={() => setEmergencyAlert(null)}>I understand</button>
+            <small>Please seek urgent medical care if symptoms are severe.</small>
           </div>
+          <button onClick={() => setEmergencyAlert(null)}>✕</button>
         </div>
       )}
 
@@ -371,6 +382,9 @@ export default function Chat() {
         <header className="chat2-topbar">
           <div className="chat2-status">{status.dot} AI {status.label}</div>
           <div className="chat2-top-actions">
+            <button className="chat2-desktop-sidebar" onClick={() => setSidebarCollapsed((s) => !s)}>
+              {sidebarCollapsed ? "☰" : "⟨"}
+            </button>
             <button className="chat2-mobile-menu" onClick={() => setMobileSidebarOpen((s) => !s)}>☰</button>
             <button onClick={() => setDarkMode((s) => !s)}>{darkMode ? "☀️" : "🌙"}</button>
             <div className="chat2-user">N</div>
