@@ -22,6 +22,14 @@ function buildFallbackHospitals(lat, lon) {
   ];
 }
 
+function buildFallbackHospitals(lat, lon) {
+    return [
+        { id: "local-1", name: "City Care Hospital", lat: lat + 0.008, lon: lon + 0.006, phone: "+919876543210", type: "General Hospital", address: "Nearby City Center" },
+        { id: "local-2", name: "Lifeline Emergency", lat: lat - 0.01, lon: lon + 0.005, phone: "+919900112233", type: "Emergency Care", address: "Main Road" },
+        { id: "local-3", name: "Community Health Clinic", lat: lat + 0.012, lon: lon - 0.009, phone: "", type: "Clinic", address: "Sector Medical Block" },
+    ];
+}
+
 function distanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
