@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
+import { downloadHealthReport } from "../services/reportDownload";
 
 export default function HealthInsightsPreview() {
     const [insights, setInsights] = useState(null);
     const [sessions, setSessions] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [downloadingReport, setDownloadingReport] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -26,6 +28,18 @@ export default function HealthInsightsPreview() {
         fetchData();
     }, []);
 
+    const handleDownloadReport = async () => {
+        try {
+            setError("");
+            setDownloadingReport(true);
+            await downloadHealthReport();
+        } catch {
+            setError("Unable to download report right now. Please try again.");
+        } finally {
+            setDownloadingReport(false);
+        }
+    };
+
     if (loading) {
         return (
             <div style={{
@@ -38,7 +52,7 @@ export default function HealthInsightsPreview() {
     }
 
     return (
-        <div style={{
+        <div className="hb-premium-page" style={{
             maxWidth: 800, margin: "32px auto", padding: "0 24px",
             fontFamily: "'DM Sans', sans-serif"
         }}>
@@ -59,7 +73,7 @@ export default function HealthInsightsPreview() {
 
             {/* AI Insights */}
             {insights ? (
-                <div style={{
+                <div className="hb-premium-card" style={{
                     background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0",
                     padding: "20px 24px", marginBottom: 24, whiteSpace: "pre-wrap",
                     lineHeight: 1.7, fontSize: 14, color: "#1e293b"
@@ -90,7 +104,7 @@ export default function HealthInsightsPreview() {
                                 ? new Date(session[0].createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                                 : "";
                             return (
-                                <div key={i} style={{
+                                <div key={i} className="hb-premium-card" style={{
                                     background: "#fff", borderRadius: 12,
                                     border: "1px solid #e2e8f0", padding: "12px 16px",
                                 }}>
@@ -109,20 +123,19 @@ export default function HealthInsightsPreview() {
 
             {/* Download Report */}
             <button
-                onClick={() => {
-                    const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-                    const token = localStorage.getItem("token");
-                    window.open(`${base}/api/health/report?token=${token}`, "_blank");
-                }}
+                onClick={handleDownloadReport}
+                disabled={downloadingReport}
                 style={{
                     marginTop: 24, width: "100%", padding: "12px",
                     borderRadius: 12, border: "none",
                     background: "linear-gradient(135deg, #0ea5e9, #06b6d4)",
-                    color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                    color: "#fff", fontWeight: 600, fontSize: 14,
+                    cursor: downloadingReport ? "not-allowed" : "pointer",
+                    opacity: downloadingReport ? 0.7 : 1,
                     fontFamily: "'DM Sans', sans-serif"
                 }}
             >
-                Download Health Report (PDF)
+                {downloadingReport ? "Preparing report..." : "Download Health Report (PDF)"}
             </button>
         </div>
     );
