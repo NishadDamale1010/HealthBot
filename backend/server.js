@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const authRoutes = require("./src/routes/auth.route");
 const chatRoutes = require("./src/routes/chat.routes");
@@ -11,6 +12,7 @@ const profileRoutes = require("./src/routes/profile.routes");
 const seasonalRoutes = require("./src/routes/seasonal.routes");
 const healthRoutes = require("./src/routes/health.routes");
 const hospitalRoutes = require("./src/routes/hospital.routes");
+const intelligenceRoutes = require("./src/routes/intelligence.routes");
 
 
 // ✅ Import WhatsApp (DO NOT initialize again)
@@ -18,11 +20,23 @@ const hospitalRoutes = require("./src/routes/hospital.routes");
 
 dotenv.config();
 const app = express();
+app.set("trust proxy", 1);
 
 // 🔐 Middleware
 app.disable("x-powered-by");
-app.use(cors());
+const allowedOrigin = process.env.FRONTEND_ORIGIN || "*";
+app.use(cors({
+  origin: allowedOrigin === "*" ? true : allowedOrigin,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  credentials: true,
+}));
 app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use((req, res, next) => {
+  req.requestId = crypto.randomUUID();
+  res.setHeader("X-Request-Id", req.requestId);
+  next();
+});
 
 // 📦 Routes
 app.use("/api/predict", predictRoutes);
@@ -32,6 +46,16 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/seasonal-alert", seasonalRoutes);
 app.use("/api/health" ,healthRoutes)
 app.use("/api/hospitals", hospitalRoutes);
+app.use("/api/intelligence", intelligenceRoutes);
+
+app.get("/healthz", (req, res) => {
+  res.status(200).json({
+    ok: true,
+    uptimeSec: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    requestId: req.requestId,
+  });
+});
 
 // 🏠 Root
 app.get("/", (req, res) => {
@@ -45,8 +69,8 @@ app.use((req, res) => {
 
 // ⚠️ Global error handler
 app.use((err, req, res, next) => {
-  console.error("Unhandled API error:", err.message);
-  res.status(500).json({ message: "Internal server error" });
+  console.error(`Unhandled API error [${req.requestId}]:`, err.message);
+  res.status(500).json({ message: "Internal server error", requestId: req.requestId });
 });
 
 // 🚀 Start server
