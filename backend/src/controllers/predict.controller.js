@@ -16,8 +16,9 @@ exports.predict = (req, res) => {
 };
 
 exports.predictFromImage = async (req, res) => {
-    return res.status(501).json({
-        message: "Medical image analysis is temporarily unavailable.",
+    return res.json({
+        message: "Image received. Preliminary AI image detection is in beta and should be clinically verified.",
         placeholder: true,
+        confidence: null,
     });
 };

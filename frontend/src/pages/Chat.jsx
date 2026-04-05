@@ -305,9 +305,12 @@ export default function Chat() {
     const [listening, setListening] = useState(false);
     const [emergency, setEmergency] = useState(false);
     const [dark, setDark] = useState(() => localStorage.getItem("hb-theme") === "dark");
+    const [imageAnalyzing, setImageAnalyzing] = useState(false);
+    const [imageAnalysisResult, setImageAnalysisResult] = useState(null);
     const recognitionRef = useRef(null);
     const bottomRef = useRef(null);
     const inputRef = useRef(null);
+    const imageInputRef = useRef(null);
     const alarmCtxRef = useRef(null);
     const alarmIntervalRef = useRef(null);
     /* ── Theme persist ── */
@@ -469,6 +472,41 @@ export default function Chat() {
         setAnswers({ symptom: text });
         setMessages(prev => [...prev, { role: "user", text }]);
         await sendToBackend(text, false);
+    }
+    const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+
+    async function handleImageDetection(file) {
+        if (!file) return;
+        if (!file.type?.startsWith("image/")) {
+            showAlert("Please upload a valid image file.");
+            return;
+        }
+        setImageAnalyzing(true);
+        setImageAnalysisResult(null);
+        try {
+            const imageBase64 = await fileToDataUrl(file);
+            const res = await API.post("/api/predict/image", {
+                imageBase64,
+                mimeType: file.type,
+                context: input || answers?.symptom || "",
+            });
+            setImageAnalysisResult(res.data);
+            const backendMessage = res?.data?.message || "Image uploaded successfully for AI review.";
+            setMessages(prev => ([
+                ...prev,
+                { role: "user", text: `🖼️ Uploaded image: ${file.name}` },
+                { role: "bot", text: backendMessage },
+            ]));
+        } catch {
+            showAlert("Image analysis failed. Please try again.");
+        } finally {
+            setImageAnalyzing(false);
+        }
     }
     /* ── Derived ── */
     const currentQ = INTAKE_QUESTIONS[step] || null;
@@ -761,22 +799,45 @@ export default function Chat() {
                         borderTop: "1px solid var(--border)", padding: "10px 14px 8px",
                         background: "var(--input-bar)", display: "flex", flexDirection: "column", gap: 8,
                     }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
                             <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
-                                🖼️ Medical image upload (coming soon)
+                                🖼️ Image-based detection is available in chat
                             </p>
-                            <button
-                                disabled
-                                style={{
-                                    border: "1px solid var(--border)", background: "var(--surface)",
-                                    color: "var(--text-body)", borderRadius: 10, padding: "8px 10px",
-                                    fontSize: 12, cursor: "not-allowed",
-                                    opacity: 0.6,
-                                }}
-                            >
-                                🖼️ Choose Image
-                            </button>
+                            <>
+                                <input
+                                    ref={imageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    style={{ display: "none" }}
+                                    onChange={(e) => handleImageDetection(e.target.files?.[0])}
+                                />
+                                <button
+                                    onClick={() => imageInputRef.current?.click()}
+                                    disabled={imageAnalyzing || loading || botTyping}
+                                    style={{
+                                        border: "1px solid var(--border)", background: "var(--surface)",
+                                        color: "var(--text-body)", borderRadius: 10, padding: "8px 10px",
+                                        fontSize: 12, cursor: "pointer",
+                                        opacity: (imageAnalyzing || loading || botTyping) ? 0.6 : 1,
+                                    }}
+                                >
+                                    {imageAnalyzing ? "Analyzing image..." : "🖼️ Choose Image"}
+                                </button>
+                            </>
                         </div>
+                        {imageAnalysisResult && (
+                            <div style={{
+                                fontSize: 12,
+                                color: "var(--text-body)",
+                                background: "var(--surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: 10,
+                                padding: "8px 10px",
+                                lineHeight: 1.5,
+                            }}>
+                                <strong>Image AI Result:</strong> {imageAnalysisResult.message || "Processed."}
+                            </div>
+                        )}
                     </div>
                     <div style={{
                         borderTop: "1px solid var(--border)", padding: "12px 14px",

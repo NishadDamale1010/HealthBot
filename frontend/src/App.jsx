@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import HealthInsights from "./pages/HealthInsights";
 import Hospitals from "./pages/Hospitals";
 import AISuite from "./pages/AISuite";
+import AIAnalysis from "./pages/AIAnalysis";
 
 const NAV_LINKS = [
   { to: "/chat", label: "Chat", icon: "💬" },
@@ -14,6 +15,7 @@ const NAV_LINKS = [
   { to: "/hospitals", label: "Nearby Hospitals", icon: "🏥", authOnly: true },
   { to: "/health", label: "Health Insights", icon: "🧠", authOnly: true },
   { to: "/ai-suite", label: "AI Suite", icon: "✨", authOnly: true },
+  { to: "/ai-analysis", label: "AI Analysis", icon: "🧪", authOnly: true },
 ];
 
 function NavLink({ to, icon, label, active }) {
@@ -232,6 +234,11 @@ function App() {
         .hb-mobile-menu.open { display: flex; }
 
         #hb-main { min-height: calc(100vh - 64px); }
+        .hb-route-shell { animation: hbRouteIn .35s ease both; }
+        @keyframes hbRouteIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         @media (max-width: 720px) {
           .hb-links, .hb-divider { display: none !important; }
@@ -344,16 +351,19 @@ function App() {
       </div>
 
       <main id="hb-main">
-        <Routes>
-          <Route path="/" element={<Chat />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/health" element={<HealthInsights />} />
-          <Route path="/hospitals" element={<Hospitals />} />
-          <Route path="/ai-suite" element={<AISuite />} />
-        </Routes>
+        <div key={location.pathname} className="hb-route-shell">
+          <Routes>
+            <Route path="/" element={<Chat />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/health" element={<HealthInsights />} />
+            <Route path="/hospitals" element={<Hospitals />} />
+            <Route path="/ai-suite" element={<AISuite />} />
+            <Route path="/ai-analysis" element={<AIAnalysis />} />
+          </Routes>
+        </div>
       </main>
     </>
   );
