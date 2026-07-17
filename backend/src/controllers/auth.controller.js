@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 // 🔐 REGISTER
 exports.register = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, role } = req.body;
 
         const emailNorm = email ? String(email).trim().toLowerCase() : "";
 
@@ -27,7 +27,8 @@ exports.register = async (req, res) => {
         const user = await User.create({
             name: name ? String(name).trim() : "",
             email: emailNorm,
-            password: hashedPassword
+            password: hashedPassword,
+            role: ["CITIZEN", "ASHA_WORKER"].includes(role) ? role : "CITIZEN"
         });
 
         res.json({ message: "User registered successfully" });
@@ -66,7 +67,8 @@ exports.login = async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                role: user.role || "CITIZEN"
             }
         });
     } catch (err) {

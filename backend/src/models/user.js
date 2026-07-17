@@ -14,6 +14,13 @@ const userSchema = new mongoose.Schema({
         required: true
     },
 
+    // --- Role-Based Access Control (RBAC) ---
+    role: {
+        type: String,
+        enum: ["CITIZEN", "ASHA_WORKER"],
+        default: "CITIZEN"
+    },
+
     // --- Health profile (optional, set after authentication) ---
     age: { type: Number, min: 0, max: 120 },
     gender: {

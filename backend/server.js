@@ -14,6 +14,10 @@ const healthRoutes = require("./src/routes/health.routes");
 const hospitalRoutes = require("./src/routes/hospital.routes");
 const intelligenceRoutes = require("./src/routes/intelligence.routes");
 
+// 🏥 SIH Blueprint Feature Routes
+const abdmRoutes = require("./src/features/abdm/abdm.routes");
+const consentRoutes = require("./src/features/consent/consent.routes");
+const ashaRoutes = require("./src/features/asha/asha.routes");
 
 // ✅ Import WhatsApp (DO NOT initialize again)
 //require("./src/whatsapp/whatsapp");
@@ -48,6 +52,11 @@ app.use("/api/health" ,healthRoutes)
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
 
+// 🏥 SIH Blueprint Feature Routes
+app.use("/api/abdm", abdmRoutes);
+app.use("/api/consent", consentRoutes);
+app.use("/api/asha", ashaRoutes);
+
 app.get("/healthz", (req, res) => {
   res.status(200).json({
     ok: true,
@@ -79,10 +88,11 @@ const PORT = process.env.PORT || 5000;
 async function startServer() {
   try {
     // 🗄️ MongoDB
-    if (!process.env.MONGO_DB) {
-      console.warn("⚠️ MONGO_DB not configured");
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_DB;
+    if (!mongoUri) {
+      console.warn("⚠️ MONGODB_URI not configured");
     } else {
-      await mongoose.connect(process.env.MONGO_DB);
+      await mongoose.connect(mongoUri);
       console.log("✅ MongoDB connected");
     }
 

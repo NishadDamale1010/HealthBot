@@ -1,20 +1,20 @@
 :root {
-  --hb-bg-a: #ecfdf5;
-  --hb-bg-b: #eff6ff;
-  --hb-bg-c: #f0f9ff;
-  --hb-card: rgba(255, 255, 255, 0.92);
-  --hb-border: rgba(16, 185, 129, 0.16);
-  --hb-shadow: 0 12px 34px rgba(2, 132, 199, 0.12), 0 2px 8px rgba(16, 185, 129, 0.08);
-  --hb-text: #0f172a;
+  --hb-primary: #10b981;
+  --hb-primary-hover: #059669;
+  --hb-bg: #f8fafc;
+  --hb-card: #ffffff;
+  --hb-border: #f1f5f9;
+  --hb-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  --hb-text: #1e293b;
   --hb-muted: #64748b;
 }
 
 body {
-  background:
-    radial-gradient(ellipse at 10% 0%, var(--hb-bg-a) 0%, transparent 45%),
-    radial-gradient(ellipse at 90% 90%, var(--hb-bg-b) 0%, transparent 50%),
-    linear-gradient(160deg, #f8fafc 0%, var(--hb-bg-c) 100%);
+  background: #e2e8f0; /* Darker backdrop for desktop so the mobile frame stands out */
   color: var(--hb-text);
+  margin: 0;
+  display: flex;
+  justify-content: center;
 }
 
 .hb-premium-page {
@@ -54,8 +54,8 @@ body {
 }
 .hb-input:focus {
   outline: none;
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 3px rgba(14,165,233,.15);
+  border-color: var(--hb-primary);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .hb-btn {
@@ -66,11 +66,11 @@ body {
   font-size: 13px;
   cursor: pointer;
   color: #fff;
-  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
-  box-shadow: 0 6px 16px rgba(14,165,233,.25);
+  background: var(--hb-primary);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
   transition: transform .12s, opacity .12s, box-shadow .12s;
 }
-.hb-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(14,165,233,.3); }
+.hb-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3); }
 .hb-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .hb-btn-secondary {
