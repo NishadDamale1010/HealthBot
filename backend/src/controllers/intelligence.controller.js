@@ -293,9 +293,50 @@ exports.ultraInsights = (req, res) => {
   });
 };
 
+function extractJsonPayload(text) {
+  if (!text || typeof text !== "string") return null;
+  const fenced = text.match(/```json\s*([\s\S]*?)```/i);
+  const raw = fenced?.[1] || text;
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return null;
+  }
+}
+
+async function runGeminiVisionJson({ prompt, imageBase64, mimeType = "image/jpeg" }) {
+  const cleaned = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      contents: [{
+        parts: [
+          { text: prompt.trim() },
+          { inlineData: { mimeType, data: cleaned } },
+        ],
+      }],
+    },
+    { timeout: 35000 }
+  );
+  const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return extractJsonPayload(raw);
+}
+
+async function runGeminiTextJson(prompt) {
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    { contents: [{ parts: [{ text: prompt.trim() }] }] },
+    { timeout: 35000 }
+  );
+  const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return extractJsonPayload(raw);
+}
+
 exports.skinDiseaseDetect = async (req, res) => {
   try {
-    const { imageBase64, mimeType = "image/jpeg", notes = "" } = req.body || {};
+    const { imageBase64, mimeType = "image/jpeg", notes = "", analysisType = "general_visible_symptoms" } = req.body || {};
     if (!imageBase64 || typeof imageBase64 !== "string") {
       return res.status(400).json({ message: "imageBase64 is required" });
     }
@@ -305,81 +346,128 @@ exports.skinDiseaseDetect = async (req, res) => {
     }
 
     if (!process.env.GEMINI_API_KEY) {
-      return res.json({
-        condition: "Unknown (AI key not configured)",
-        confidence: 35,
-        severity: "Moderate",
-        explanation: "Could not run visual model. Please consult dermatologist if rash/spread/itching worsens.",
-        careTips: ["Keep area clean and dry", "Avoid scratching", "Use gentle soap and avoid irritants"],
-      });
+      return res.status(503).json({ message: "Vision model is not configured (missing GEMINI_API_KEY)." });
     }
 
     const prompt = `
-You are a dermatology triage assistant.
-Analyze this skin image and return JSON with keys:
-condition, confidence (0-100), severity (Mild/Moderate/Severe), explanation, careTips (array of 3 short tips), redFlags (array).
-Do not claim certainty. Mention this is preliminary.
+You are a medical visual triage assistant.
+Analyze this clinical image for ${analysisType}.
+Return ONLY strict JSON with this schema:
+{
+  "detected_condition": "string",
+  "confidence": 0.0,
+  "severity": "low|medium|high",
+  "description": "string",
+  "recommendations": ["string","string","string"],
+  "emergency": true_or_false,
+  "red_flags": ["string"]
+}
+Rules:
+- Confidence must be between 0 and 1.
+- emergency=true if signs suggest urgent care (airway risk, severe swelling, bleeding, vision threat, etc.)
+- Keep response preliminary and non-diagnostic.
 Patient notes: ${notes || "None"}
 `;
 
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        contents: [{
-          parts: [
-            { text: prompt.trim() },
-            { inlineData: { mimeType, data: cleaned } },
-          ],
-        }],
-      },
-      { timeout: 25000 }
-    );
-
-    const raw = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return res.json({
-        condition: "Possible dermatitis",
-        confidence: 52,
-        severity: "Moderate",
-        explanation: "Model produced non-structured output. Treat this as preliminary and seek medical advice if persistent.",
-        careTips: ["Moisturize regularly", "Avoid new cosmetic products", "Monitor changes over 24-48h"],
-      });
+    const parsed = await runGeminiVisionJson({ prompt, imageBase64: cleaned, mimeType });
+    if (!parsed) {
+      return res.status(502).json({ message: "Vision model returned invalid output format." });
     }
-    const parsed = JSON.parse(jsonMatch[0]);
-    return res.json(parsed);
-  } catch {
-    return res.status(500).json({ message: "Skin image analysis failed" });
+
+    const riskWord = String(parsed.severity || "low").toLowerCase();
+    const response = {
+      detected_condition: parsed.detected_condition || "Unclear visual finding",
+      confidence: Math.max(0, Math.min(1, Number(parsed.confidence) || 0.5)),
+      severity: ["low", "medium", "high"].includes(riskWord) ? riskWord : "medium",
+      description: parsed.description || "Preliminary visual triage generated by AI.",
+      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 4) : [],
+      emergency: Boolean(parsed.emergency) || riskWord === "high",
+      red_flags: Array.isArray(parsed.red_flags) ? parsed.red_flags : [],
+    };
+    response.condition = response.detected_condition;
+    response.explanation = response.description;
+    response.careTips = response.recommendations;
+    response.confidencePercent = Math.round(response.confidence * 100);
+    return res.json(response);
+  } catch (err) {
+    console.error("skinDiseaseDetect error:", err.message);
+    return res.status(500).json({ message: "Image analysis failed" });
   }
 };
 
-exports.labReportExplain = (req, res) => {
-  const text = String(req.body?.reportText || "").toLowerCase();
-  if (!text.trim()) {
-    return res.status(400).json({ message: "reportText is required" });
-  }
+exports.labReportAnalyze = async (req, res) => {
+  try {
+    const { fileBase64, mimeType = "application/pdf", reportText = "", patientContext = "" } = req.body || {};
+    if (!reportText && !fileBase64) {
+      return res.status(400).json({ message: "Provide reportText or fileBase64." });
+    }
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ message: "Lab analysis model is not configured (missing GEMINI_API_KEY)." });
+    }
 
-  const findings = [];
-  if (/hemoglobin[^0-9]*([0-9]+(\.[0-9]+)?)/.test(text)) {
-    const hb = Number(text.match(/hemoglobin[^0-9]*([0-9]+(\.[0-9]+)?)/)?.[1]);
-    if (Number.isFinite(hb) && hb < 12) findings.push("Hemoglobin appears low, possible anemia tendency.");
-  }
-  if (/glucose[^0-9]*([0-9]+(\.[0-9]+)?)/.test(text)) {
-    const glucose = Number(text.match(/glucose[^0-9]*([0-9]+(\.[0-9]+)?)/)?.[1]);
-    if (Number.isFinite(glucose) && glucose > 100) findings.push("Glucose seems elevated; monitor sugar control.");
-  }
-  if (/vitamin d[^0-9]*([0-9]+(\.[0-9]+)?)/.test(text)) {
-    const vd = Number(text.match(/vitamin d[^0-9]*([0-9]+(\.[0-9]+)?)/)?.[1]);
-    if (Number.isFinite(vd) && vd < 20) findings.push("Vitamin D looks low; discuss supplementation with clinician.");
-  }
+    let extracted = { tests: [] };
+    if (fileBase64) {
+      const extractPrompt = `
+You are a medical OCR + structuring assistant.
+Read this lab report and extract test rows.
+Return ONLY JSON:
+{
+  "tests": [
+    {"test":"Hemoglobin","value":"9.1","unit":"g/dL","reference_range":"12-16","status":"Low|Normal|High"}
+  ]
+}
+`;
+      extracted = await runGeminiVisionJson({ prompt: extractPrompt, imageBase64: fileBase64, mimeType }) || { tests: [] };
+    } else if (reportText) {
+      const textExtractPrompt = `
+Convert this unstructured lab text into JSON rows.
+Text:
+${reportText}
+Return ONLY:
+{"tests":[{"test":"","value":"","unit":"","reference_range":"","status":"Low|Normal|High"}]}
+`;
+      extracted = await runGeminiTextJson(textExtractPrompt) || { tests: [] };
+    }
 
-  return res.json({
-    summary: findings.length ? "Some lab markers may need follow-up." : "No major abnormal marker detected from provided text.",
-    findings,
-    nextSteps: [
-      "Share this summary with your doctor.",
-      "Repeat test if advised and track trend over time.",
-      "Do not self-medicate based only on AI interpretation.",
-    ],
-  });
+    const analysisPrompt = `
+You are a clinical lab interpretation assistant.
+Patient context: ${patientContext || "Not provided"}
+Lab values JSON:
+${JSON.stringify(extracted)}
+
+Return ONLY strict JSON:
+{
+  "summary": "string",
+  "abnormal_values": [{"test":"string","value":"string","status":"Low|High"}],
+  "risk_level": "low|medium|high",
+  "recommendations": ["string","string","string"],
+  "simple_explanation": "string",
+  "emergency": true_or_false
+}
+`;
+    const analysis = await runGeminiTextJson(analysisPrompt);
+    if (!analysis) {
+      return res.status(502).json({ message: "Lab analysis model returned invalid output." });
+    }
+
+    return res.json({
+      summary: analysis.summary || "AI analyzed the report.",
+      abnormal_values: Array.isArray(analysis.abnormal_values) ? analysis.abnormal_values : [],
+      risk_level: ["low", "medium", "high"].includes(String(analysis.risk_level).toLowerCase())
+        ? String(analysis.risk_level).toLowerCase()
+        : "medium",
+      recommendations: Array.isArray(analysis.recommendations) ? analysis.recommendations.slice(0, 5) : [],
+      simple_explanation: analysis.simple_explanation || "This is an AI-generated interpretation and not a diagnosis.",
+      emergency: Boolean(analysis.emergency) || String(analysis.risk_level).toLowerCase() === "high",
+      extracted_tests: Array.isArray(extracted.tests) ? extracted.tests : [],
+    });
+  } catch (err) {
+    console.error("labReportAnalyze error:", err.message);
+    return res.status(500).json({ message: "Lab report analysis failed" });
+  }
+};
+
+exports.labReportExplain = async (req, res) => {
+  const reportText = String(req.body?.reportText || "");
+  return exports.labReportAnalyze({ body: { reportText } }, res);
 };

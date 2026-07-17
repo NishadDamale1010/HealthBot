@@ -11,6 +11,7 @@ const {
   advancedInsights,
   ultraInsights,
   skinDiseaseDetect,
+  labReportAnalyze,
   labReportExplain,
 } = require("../controllers/intelligence.controller");
 
@@ -25,6 +26,7 @@ router.post("/daily-coach", dailyCoach);
 router.post("/advanced-insights", advancedInsights);
 router.post("/ultra-insights", ultraInsights);
 router.post("/skin-detect", skinDiseaseDetect);
+router.post("/lab-report-analyze", labReportAnalyze);
 router.post("/lab-report-explain", labReportExplain);
 router.get("/timeline", optionalAuth, timeline);
 
