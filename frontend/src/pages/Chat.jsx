@@ -174,12 +174,12 @@ const STYLES = `
     --green-light:#064e3b; --green-dim:#064e3b; --green-mid:#065f46;
     --blue:#3b82f6; --red:#ef4444; --yellow:#f59e0b;
     --text:#e2e8f0; --text-body:#e2e8f0; --muted:#64748b;
-    --user-bubble:linear-gradient(135deg,#1d4ed8,#2563eb); --user-text:#ffffff;
+    --user-bubble:linear-gradient(135deg,#10b981,#059669); --user-text:#ffffff;
     --bot-bubble:#111827; --bot-border:rgba(255,255,255,0.07);
-    --profile-bg:rgba(59,130,246,0.1); --profile-bdr:rgba(59,130,246,0.25);
+    --profile-bg:rgba(16,185,129,0.1); --profile-bdr:rgba(16,185,129,0.25);
     --input-bg:#161d2e; --input-bar:#111827;
     --shadow:0 24px 60px rgba(0,0,0,.5);
-    --shadow-user:0 4px 20px rgba(29,78,216,0.3);
+    --shadow-user:0 4px 20px rgba(16,185,129,0.3);
   }
   .hb-root:not(.hb-dark) {
     background:
@@ -304,6 +304,7 @@ export default function Chat() {
     const [language, setLanguage] = useState("en");
     const [listening, setListening] = useState(false);
     const [emergency, setEmergency] = useState(false);
+    const [voiceEnabled, setVoiceEnabled] = useState(false);
     const [dark, setDark] = useState(() => localStorage.getItem("hb-theme") === "dark");
     const recognitionRef = useRef(null);
     const bottomRef = useRef(null);
@@ -386,6 +387,13 @@ export default function Chat() {
     function showAlert(msg) { setAlert(msg); setTimeout(() => setAlert(""), 3000); }
     /* ── Section-based bot message (max 3-4 cards) ── */
     async function pushBotAnimated(fullText, extra = {}) {
+        if (voiceEnabled && "speechSynthesis" in window) {
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(fullText);
+            u.lang = language === "hi" ? "hi-IN" : language === "mr" ? "mr-IN" : "en-US";
+            window.speechSynthesis.speak(u);
+        }
         const cards = splitIntoCards(fullText);
         setBotTyping(true);
         for (let i = 0; i < cards.length; i++) {
@@ -554,6 +562,14 @@ export default function Chat() {
                         <EcgLine />
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button className="theme-btn" onClick={() => {
+                            setVoiceEnabled(v => {
+                                if (v && window.speechSynthesis) window.speechSynthesis.cancel();
+                                return !v;
+                            });
+                        }} title="Toggle voice output">
+                            {voiceEnabled ? "🔊" : "🔇"}
+                        </button>
                         <button className="theme-btn" onClick={() => setDark(d => !d)} title="Toggle theme">
                             {dark ? "\u2600\uFE0F" : "\u{1F319}"}
                         </button>
