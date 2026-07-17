@@ -1,64 +1,52 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import API from "../services/api";
 import SeasonalAlert from "../components/SeasonalAlert";
-import { downloadHealthReport } from "../services/reportDownload";
-
-const QUICK_REPLIES = ["I have fever", "Chest pain", "Headache", "Stomach pain", "Shortness of breath"];
-const SYMPTOM_KEYWORDS = ["fever", "cough", "pain", "headache", "nausea", "breath", "fatigue", "dizziness"];
-const EMERGENCY_TERMS = ["chest pain", "breathing", "shortness of breath", "unconscious", "severe bleeding", "high fever"];
-const STORAGE_KEY = "healthbot.chat.conversations.v2";
-
-const nowText = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-const createConversationState = () => ({
-  symptoms: [],
-  duration: "",
-  severity: "",
-  previousAnswers: [],
-  riskLevel: "Low",
-  lastPrediction: null,
-  messageType: "greeting",
-});
-
-const createChat = (seed = {}) => ({
-  id: seed.id || crypto.randomUUID(),
-  title: seed.title || "New Conversation",
-  preview: seed.preview || "Start a health conversation",
-  updatedAt: seed.updatedAt || new Date().toISOString(),
-  messages: seed.messages || [
+/* ── Google Fonts ── */
+if (typeof document !== "undefined" && !document.getElementById("hb-fonts")) {
+    const link = document.createElement("link");
+    link.id = "hb-fonts"; link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap";
+    document.head.appendChild(link);
+}
+/* ─── Intake questions ─────────────────────────────────────────────────────── */
+const INTAKE_QUESTIONS = [
     {
-      role: "bot",
-      text: "Hi, I’m HealthBot AI. Tell me your symptoms and I’ll guide you step by step.",
-      time: nowText(),
+        key: "symptom",
+        text: "Hi! I\u2019m your HealthBot assistant \u{1F44B}\n\nI\u2019ll ask a few quick questions so I can guide you better.\n\nWhat is bothering you most right now?",
+        placeholder: "Example: headache, fever, sore throat\u2026",
     },
-  ],
-  state: { ...createConversationState(), ...(seed.state || {}) },
-});
-
-const statusByState = (loading) => (loading ? { label: "Thinking", dot: "🟡" } : { label: "Online", dot: "🟢" });
-
-const parseConversationState = (messages, previousState = createConversationState(), incomingPrediction = null, incomingType = "") => {
-  const combined = messages.map((m) => m.text.toLowerCase()).join(" ");
-  const symptoms = SYMPTOM_KEYWORDS.filter((k) => combined.includes(k));
-
-  const durationMatch = combined.match(/(\d+\s*(day|days|week|weeks|month|months)|since\s+\w+)/i);
-  const severityMatch = combined.match(/\b(mild|moderate|high|severe|unbearable|low)\b/i);
-
-  const previousAnswers = messages
-    .filter((m) => m.role === "user")
-    .slice(-6)
-    .map((m) => m.text);
-
-  return {
-    ...previousState,
-    symptoms,
-    duration: durationMatch?.[0] || previousState.duration,
-    severity: severityMatch?.[0] || previousState.severity,
-    previousAnswers,
-    riskLevel: incomingPrediction?.risk || previousState.riskLevel || "Low",
-    lastPrediction: incomingPrediction || previousState.lastPrediction || null,
-    messageType: incomingType || previousState.messageType || "followup",
-  };
+    {
+        key: "duration",
+        text: "When did this start, and is it getting better, worse, or the same?",
+        placeholder: "Example: since last night, 3 days, getting worse\u2026",
+    },
+    {
+        key: "severity",
+        text: "How strong is it on a scale of 1\u201310 (1 = mild, 10 = very severe)?",
+        placeholder: "Example: 6 out of 10",
+        chips: ["1\u20133 \u00B7 Mild", "4\u20136 \u00B7 Moderate", "7\u20139 \u00B7 Severe", "10 \u00B7 Unbearable"],
+    },
+    {
+        key: "location",
+        text: "Where do you feel it most? Does the discomfort spread anywhere else?",
+        placeholder: "Example: left side of head, spreads to neck\u2026",
+    },
+    {
+        key: "extra",
+        text: "Any other symptoms I should know about? (type 'none' if no)",
+        placeholder: "Example: nausea, dizziness, chills\u2026",
+    },
+];
+const QUICK_PROMPTS = [
+    "I have fever and body ache",
+    "I feel tired and dizzy",
+    "I have sore throat and cough",
+    "I have stomach pain and nausea",
+];
+const LANG_MAP = {
+    en: { placeholder: "Type your answer\u2026" },
+    hi: { placeholder: "\u0905\u092A\u0928\u093E \u0909\u0924\u094D\u0924\u0930 \u0932\u093F\u0916\u0947\u0902\u2026" },
+    mr: { placeholder: "\u0924\u0941\u092E\u091A\u0947 \u0909\u0924\u094D\u0924\u0930 \u0932\u093F\u0939\u093E\u2026" },
 };
 const EMERGENCY_KEYWORDS = [
     "chest pain", "heart attack", "not breathing", "unconscious",
@@ -303,134 +291,97 @@ const STYLES = `
 `;
 /* ===============================================================================
    MAIN COMPONENT
+=============================================================================== */
+export default function Chat() {
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState("");
+    const [step, setStep] = useState(0);
+    const [answers, setAnswers] = useState({});
+    const [phase, setPhase] = useState("intake");  // intake | ready | chat
+    const [loading, setLoading] = useState(false);
+    const [botTyping, setBotTyping] = useState(false);
+    const [alert, setAlert] = useState("");
+    const [language, setLanguage] = useState("en");
+    const [listening, setListening] = useState(false);
+    const [emergency, setEmergency] = useState(false);
+    const [voiceEnabled, setVoiceEnabled] = useState(false);
+    const [dark, setDark] = useState(() => localStorage.getItem("hb-theme") === "dark");
+    const recognitionRef = useRef(null);
+    const bottomRef = useRef(null);
+    const inputRef = useRef(null);
+    const alarmCtxRef = useRef(null);
+    const alarmIntervalRef = useRef(null);
+    /* ── Theme persist ── */
+    useEffect(() => {
+        localStorage.setItem("hb-theme", dark ? "dark" : "light");
+    }, [dark]);
+    /* ── Speech Recognition ── */
+    useEffect(() => {
+        if (!("webkitSpeechRecognition" in window)) return;
+        const r = new window.webkitSpeechRecognition();
+        r.continuous = false; r.interimResults = false;
+        r.lang = language === "hi" ? "hi-IN" : language === "mr" ? "mr-IN" : "en-US";
+        r.onstart = () => setListening(true);
+        r.onend = () => setListening(false);
+        r.onresult = e => setInput(e.results[0][0].transcript);
+        recognitionRef.current = r;
+    }, [language]);
+    /* ── Auto-scroll ── */
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, botTyping]);
+    /* ── First question on mount ── */
+    useEffect(() => {
+        setTimeout(() => pushBotAnimated(INTAKE_QUESTIONS[0].text), 500);
+    }, []);
+    /* ── Helpers ── */
+    const stopAlarm = () => {
+        if (alarmIntervalRef.current) {
+            clearInterval(alarmIntervalRef.current);
+            alarmIntervalRef.current = null;
+        }
+        if (alarmCtxRef.current) {
+            alarmCtxRef.current.close().catch((err) => {
+                console.warn("Unable to stop alarm audio context cleanly:", err);
+            });
+            alarmCtxRef.current = null;
+        }
     };
-
-    loadTimeline();
-  }, []);
-
-  useEffect(() => {
-    if (!activeId && conversations[0]) setActiveId(conversations[0].id);
-  }, [activeId, conversations]);
-
-  useEffect(() => {
-    const onClickOutside = (e) => {
-      if (!mobileSidebarOpen) return;
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
-        setMobileSidebarOpen(false);
-      }
+    const playAlarm = () => {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            stopAlarm();
+            const ctx = new AudioCtx();
+            alarmCtxRef.current = ctx;
+            const beep = (freq, length, startAt = 0) => {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.type = "sawtooth";
+                oscillator.frequency.setValueAtTime(freq, ctx.currentTime + startAt);
+                gain.gain.setValueAtTime(0.001, ctx.currentTime + startAt);
+                gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + startAt + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startAt + length);
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start(ctx.currentTime + startAt);
+                oscillator.stop(ctx.currentTime + startAt + length);
+            };
+            const pulse = () => {
+                beep(880, 0.18, 0);
+                beep(660, 0.2, 0.22);
+            };
+            pulse();
+            alarmIntervalRef.current = setInterval(pulse, 900);
+        } catch (err) {
+            console.warn("Unable to synthesize emergency alarm sound:", err);
+        }
     };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [mobileSidebarOpen]);
-
-  useEffect(() => {
-    if (!emergencyAlert) return undefined;
-    const timer = setTimeout(() => setEmergencyAlert(null), 6500);
-    return () => clearTimeout(timer);
-  }, [emergencyAlert]);
-
-  const activeChat = useMemo(
-    () => conversations.find((c) => c.id === activeId) || conversations[0],
-    [conversations, activeId],
-  );
-
-  const messages = useMemo(() => activeChat?.messages ?? [], [activeChat]);
-
-  useEffect(() => {
-    listEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
-
-  const detectedSymptoms = useMemo(() => {
-    const text = messages.map((m) => m.text.toLowerCase()).join(" ");
-    return SYMPTOM_KEYWORDS.filter((k) => text.includes(k)).slice(0, 5);
-  }, [messages]);
-
-  const riskLabel = activeChat?.state?.riskLevel || "Low";
-  const riskPercent = riskLabel === "High" ? 84 : riskLabel === "Medium" ? 56 : 28;
-  const aiConfidence = activeChat?.state?.lastPrediction?.confidence
-    ? Number.parseFloat(activeChat.state.lastPrediction.confidence) * 100
-    : Math.min(98, 68 + detectedSymptoms.length * 6);
-
-  const updateConversation = (chatId, updater) => {
-    setConversations((prev) => prev.map((c) => (c.id === chatId ? updater(c) : c)));
-  };
-
-  const updateChatState = (chatId, patch) => {
-    updateConversation(chatId, (chat) => ({ ...chat, state: { ...(chat.state || {}), ...patch } }));
-  };
-
-  const addMessage = (chatId, message, meta = {}) => {
-    updateConversation(chatId, (chat) => {
-      const next = [...chat.messages, message];
-      const firstUser = next.find((m) => m.role === "user")?.text || "New Conversation";
-      return {
-        ...chat,
-        messages: next,
-        title: firstUser.slice(0, 32),
-        preview: message.text.slice(0, 58),
-        updatedAt: new Date().toISOString(),
-        state: parseConversationState(next, chat.state, meta.prediction, meta.messageType),
-      };
-    });
-  };
-
-  const maybeTriggerEmergency = ({ botReply, prediction, messageType }) => {
-    const highRisk = String(prediction?.risk || "").toLowerCase() === "high";
-    const emergencyType = String(messageType || "").toLowerCase() === "emergency";
-    const containsEmergencySignal = EMERGENCY_TERMS.some((term) => String(botReply).toLowerCase().includes(term));
-
-    if (highRisk || emergencyType || containsEmergencySignal) {
-      setEmergencyAlert({
-        title: "Emergency Alert",
-        reason: buildEmergencyReason(botReply, prediction),
-      });
-      if (typeof window !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate([200, 100, 200]);
-      }
-    }
-  };
-
-  const sendMessage = async (text, overrides = {}) => {
-    if (!text.trim() || !activeChat || loading) return;
-
-    const userText = text.trim();
-    setInput("");
-    addMessage(activeChat.id, { role: "user", text: userText, time: nowText() });
-    setLoading(true);
-
-    const historyPayload = [...(activeChat.messages || []), { role: "user", text: userText }]
-      .slice(-12)
-      .map((m) => ({ role: m.role === "bot" ? "assistant" : "user", content: m.text }));
-
-    const contextState = {
-      ...(activeChat.state || createConversationState()),
-      history: historyPayload,
-      aiMode,
-      detectedSymptoms,
-      ...(overrides.context || {}),
-    };
-
-    try {
-      console.log("[Chat] sending request", { type: overrides.type || "followup", history: historyPayload.length, contextState });
-      const { data } = await API.post("/api/chat", {
-        type: overrides.type || "followup",
-        message: userText,
-        context: contextState,
-      });
-
-      const reply = data?.reply || "I’m here to help.";
-      const prediction = data?.prediction || null;
-      const messageType = data?.messageType || "followup";
-
-      addMessage(activeChat.id, { role: "bot", text: reply, time: nowText() }, { prediction, messageType });
-      maybeTriggerEmergency({ botReply: reply, prediction, messageType });
-    } catch (err) {
-      console.error("[Chat] request failed", err);
-      addMessage(activeChat.id, { role: "bot", text: "Server is busy. Please try again.", time: nowText() });
-      setAlert("Unable to reach AI service. Please retry.");
-      setTimeout(() => setAlert(""), 2200);
-    } finally {
-      setLoading(false);
+    function detectEmergency(text, risk) {
+        const lower = text.toLowerCase();
+        if ((risk === "High" || EMERGENCY_KEYWORDS.some(w => lower.includes(w))) && !emergency) {
+            setEmergency(true); playAlarm();
+        }
     }
     useEffect(() => () => stopAlarm(), []);
     function showAlert(msg) { setAlert(msg); setTimeout(() => setAlert(""), 3000); }
@@ -453,92 +404,79 @@ const STYLES = `
         }
         setBotTyping(false);
     }
-    if (kind === "predict") {
-      setLoading(true);
-      try {
-        const { data } = await API.post("/api/intelligence/risk-score", {
-          age: 32,
-          bmi: 24,
-          sleepHours: 7,
-          activityDaysPerWeek: 3,
-          sugarLevel: detectedSymptoms.length >= 3 ? 7 : 5,
-        });
-        const heartLevel = data?.heartRisk?.level || "Low";
-        const diabetesLevel = data?.diabetesRisk?.level || "Low";
-        const rank = { Low: 1, Moderate: 2, Medium: 2, High: 3 };
-        const risk = rank[heartLevel] >= rank[diabetesLevel] ? heartLevel : diabetesLevel;
-        const normalizedRisk = risk === "Moderate" ? "Medium" : risk;
-        updateChatState(activeChat.id, {
-          riskLevel: normalizedRisk,
-          lastPrediction: { confidence: (0.62 + detectedSymptoms.length * 0.07).toFixed(2) },
-        });
-        addMessage(
-          activeChat.id,
-          {
-            role: "bot",
-            text: `📊 Risk prediction updated.\nHeart Risk: ${heartLevel}\nDiabetes Risk: ${diabetesLevel}\nOverall Risk: ${normalizedRisk}`,
-            time: nowText(),
-          },
-          { prediction: { risk: normalizedRisk }, messageType: "prediction" },
-        );
-      } catch {
-        addMessage(activeChat.id, { role: "bot", text: "Risk prediction is currently unavailable.", time: nowText() });
-      } finally {
-        setLoading(false);
-      }
-      return;
+    /* ── Handle user send ── */
+    async function handleSend(overrideText) {
+        const text = (overrideText ?? input).trim();
+        if (!text || loading || botTyping) return;
+        setInput("");
+        setMessages(prev => [...prev, { role: "user", text }]);
+        if (phase === "intake") {
+            const currentQ = INTAKE_QUESTIONS[step];
+            const newAnswers = { ...answers, [currentQ.key]: text };
+            setAnswers(newAnswers);
+            const nextStep = step + 1;
+            if (nextStep < INTAKE_QUESTIONS.length) {
+                setStep(nextStep);
+                await delay(200);
+                await pushBotAnimated(INTAKE_QUESTIONS[nextStep].text);
+            } else {
+                setStep(nextStep);
+                setPhase("ready");
+                await delay(200);
+                await pushBotAnimated(
+                    "Thanks for sharing that! I have everything I need. \u{1FA7A} " +
+                    "Tap the Analyze button below and I'll give you a detailed assessment."
+                );
+            }
+        } else if (phase === "chat") {
+            await sendToBackend(text, false);
+        }
     }
-    if (kind === "followup") return sendMessage("Ask me important follow-up questions for diagnosis.");
-    if (kind === "report") {
-      try {
-        await downloadHealthReport();
-      } catch {
-        setAlert("Could not generate report right now.");
-        setTimeout(() => setAlert(""), 2000);
-      }
+    /* ── Send to backend ── */
+    async function sendToBackend(userMessage, isAnalysis) {
+        setLoading(true); setBotTyping(true);
+        try {
+            const analysisMessage = Object.entries(answers)
+                .filter(([, v]) => v && v.toLowerCase() !== "none")
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(". ");
+            const payload = isAnalysis
+                ? { type: "analysis", message: analysisMessage, answers, lang: language }
+                : { type: "followup", message: userMessage, context: answers, lang: language };
+            const res = await API.post("/api/chat", payload);
+            const { reply, prediction, isProfileQuestion } = res.data;
+            // Strip any leftover "Risk: ..." line from reply text (backend should already strip it,
+            // but this is a safety net so the risk badge is the single source of truth)
+            const replyText = (reply || "I'm sorry, I couldn't process that.")
+                .replace(/\n*\s*Risk:\s*(High|Medium|Low)\s*$/i, "").trimEnd();
+            // Use inferRisk to properly assess severity based on backend + user input
+            const risk = isProfileQuestion ? null : inferRisk(prediction?.risk, answers);
+            const disease = prediction?.disease;
+            setBotTyping(false);
+            await pushBotAnimated(replyText, { risk, disease, isProfileQuestion: !!isProfileQuestion });
+            if (!isProfileQuestion) detectEmergency(userMessage || "", risk);
+        } catch {
+            setBotTyping(false);
+            showAlert("\u26A0\uFE0F Server error. Please try again.");
+            setMessages(prev => prev.slice(0, -1));
+        } finally {
+            setLoading(false);
+            inputRef.current?.focus();
+        }
     }
-  };
-
-  const handleNewChat = () => {
-    const chat = createChat();
-    setConversations((prev) => [chat, ...prev]);
-    setActiveId(chat.id);
-    setMobileSidebarOpen(false);
-  };
-
-  const fileToBase64 = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-  const handleImageFile = async (file) => {
-    if (!file || !file.type?.startsWith("image/")) return;
-    if (!activeChat || imageAnalyzing) return;
-
-    setImageAnalyzing(true);
-    const dataUrl = await fileToBase64(file);
-    setImagePreview(dataUrl);
-    addMessage(activeChat.id, { role: "user", text: `📎 Uploaded image: ${file.name}`, time: nowText() });
-    try {
-      const { data } = await API.post("/api/predict/image", { imageBase64: dataUrl, mimeType: file.type });
-      const responseMessage = data.message || "Image analyzed.";
-      addMessage(activeChat.id, { role: "bot", text: responseMessage, time: nowText() });
-      maybeTriggerEmergency({ botReply: responseMessage, prediction: data?.prediction, messageType: data?.messageType });
-    } catch {
-      addMessage(activeChat.id, { role: "bot", text: "Image analysis failed.", time: nowText() });
-    } finally {
-      setImageAnalyzing(false);
+    /* ── Analyze button ── */
+    async function handleAnalyze() {
+        if (loading || botTyping) return;
+        setPhase("chat");
+        setMessages(prev => [...prev, { role: "user", text: "\u{1F50D} Analyze my symptoms" }]);
+        await sendToBackend(null, true);
     }
-  };
-
-  const tryVoiceInput = () => {
-    const Recognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-    if (!Recognition) {
-      setAlert("Voice not supported in this browser.");
-      setTimeout(() => setAlert(""), 2000);
-      return;
+    /* ── Quick prompt (empty-state shortcut) ── */
+    async function handleQuickPrompt(text) {
+        setPhase("chat");
+        setAnswers({ symptom: text });
+        setMessages(prev => [...prev, { role: "user", text }]);
+        await sendToBackend(text, false);
     }
     /* ── Derived ── */
     const currentQ = INTAKE_QUESTIONS[step] || null;
@@ -642,67 +580,284 @@ const STYLES = `
                         </select>
                     </div>
                 </div>
-              </div>
-            ))}
-
-            {loading && (
-              <div className="chat2-msg bot">
-                <div className="chat2-avatar glow">🤖</div>
-                <div className="chat2-bubble thinking">
-                  <p>AI is thinking</p>
-                  <div className="chat2-dots"><span /><span /><span /></div>
+                {/* ── Progress bar ── */}
+                {phase === "intake" && (
+                    <div style={{
+                        maxWidth: 780, margin: "0 auto 10px",
+                        display: "flex", alignItems: "center", gap: 10, padding: "0 2px",
+                    }}>
+                        <div style={{ flex: 1, height: 4, background: "var(--green-light)", borderRadius: 4, overflow: "hidden" }}>
+                            <div style={{
+                                height: "100%", borderRadius: 4,
+                                background: "linear-gradient(90deg,#10b981,#059669)",
+                                width: `${(step / INTAKE_QUESTIONS.length) * 100}%`,
+                                transition: "width .4s ease",
+                            }} />
+                        </div>
+                        <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap", fontFamily: "'DM Mono',monospace" }}>
+                            {step}/{INTAKE_QUESTIONS.length}
+                        </span>
+                    </div>
+                )}
+                {/* ── Chat container ── */}
+                <div style={{
+                    maxWidth: 780, margin: "0 auto",
+                    background: "var(--surface)", border: "1px solid var(--border)",
+                    borderRadius: 22, display: "flex", flexDirection: "column",
+                    height: "70vh", overflow: "hidden", boxShadow: cardShadow,
+                }}>
+                    {/* Messages */}
+                    <div className="hb-scroll" style={{ flex: 1, overflowY: "auto", padding: "20px 20px 8px" }}>
+                        {/* Empty state */}
+                        {messages.length === 0 && !botTyping && (
+                            <div style={{
+                                height: "100%", display: "flex", flexDirection: "column",
+                                alignItems: "center", justifyContent: "center",
+                                textAlign: "center", padding: "0 20px",
+                            }}>
+                                <div style={{
+                                    width: 80, height: 80, borderRadius: 24,
+                                    background: dark ? "linear-gradient(135deg,#064e3b,#065f46)" : "linear-gradient(135deg,#d1fae5,#a7f3d0)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 36, marginBottom: 18,
+                                    boxShadow: dark ? "0 0 40px rgba(16,185,129,.2)" : "0 8px 32px rgba(5,150,105,.2)",
+                                    border: dark ? "none" : "1px solid rgba(16,185,129,.2)",
+                                }}>{"\u{1FA7A}"}</div>
+                                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 6, color: "var(--text)" }}>
+                                    How can I help you today?
+                                </div>
+                                <p style={{ color: "var(--muted)", fontSize: 13, maxWidth: 320, lineHeight: 1.7, marginBottom: 24 }}>
+                                    Describe your symptoms and I'll analyse them, ask follow-up questions, and give you a health assessment.
+                                </p>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 440 }}>
+                                    {QUICK_PROMPTS.map(q => (
+                                        <button key={q} className="quick-chip" onClick={() => handleQuickPrompt(q)}>{q}</button>
+                                    ))}
+                                </div>
+                                <div style={{ marginTop: 28, display: "flex", gap: 24 }}>
+                                    {[{ icon: "\u{1F52C}", label: "Symptom Analysis" }, { icon: "\u{1F4CA}", label: "Risk Assessment" }, { icon: "\u{1F48A}", label: "Health Advice" }].map(({ icon, label }) => (
+                                        <div key={label} style={{ textAlign: "center" }}>
+                                            <div style={{
+                                                width: 44, height: 44, borderRadius: 14,
+                                                background: dark ? "var(--card)" : "var(--green-dim)",
+                                                border: "1px solid var(--border)",
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                fontSize: 20, margin: "0 auto 6px",
+                                            }}>{icon}</div>
+                                            <div style={{ fontSize: 11, color: "var(--muted)" }}>{label}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {/* Message list */}
+                        {messages.map((msg, i) => {
+                            const isUser = msg.role === "user";
+                            const risk = msg.risk ? riskConfig(msg.risk, dark) : null;
+                            return (
+                                <div key={i} className="msg-in" style={{
+                                    display: "flex",
+                                    justifyContent: isUser ? "flex-end" : "flex-start",
+                                    marginBottom: 14, alignItems: "flex-end", gap: 8,
+                                }}>
+                                    {!isUser && (
+                                        <div style={{
+                                            width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+                                            background: msg.isProfileQuestion
+                                                ? (dark ? "linear-gradient(135deg,#1d4ed8,#1e40af)" : "linear-gradient(135deg,#0284c7,#0369a1)")
+                                                : "linear-gradient(135deg,#10b981,#059669)",
+                                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+                                            boxShadow: dark ? "none" : "0 2px 8px rgba(5,150,105,.2)",
+                                        }}>
+                                            {msg.isProfileQuestion ? "\u{1F4CB}" : "\u{1FA7A}"}
+                                        </div>
+                                    )}
+                                    <div style={{ maxWidth: "72%" }}>
+                                        {msg.isProfileQuestion && (
+                                            <div style={{
+                                                fontSize: 10, color: dark ? "#60a5fa" : "#0284c7",
+                                                fontWeight: 600, letterSpacing: ".06em",
+                                                marginBottom: 4, fontFamily: "'DM Mono',monospace",
+                                            }}>PROFILE SETUP</div>
+                                        )}
+                                        <div style={{
+                                            padding: "11px 15px",
+                                            borderRadius: isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                                            background: isUser ? "var(--user-bubble)"
+                                                : msg.isProfileQuestion ? "var(--profile-bg)" : "var(--bot-bubble)",
+                                            border: isUser ? "none"
+                                                : msg.isProfileQuestion ? "1px solid var(--profile-bdr)" : "1px solid var(--bot-border)",
+                                            color: isUser ? "var(--user-text)" : "var(--text-body)",
+                                            fontSize: 13.5, lineHeight: 1.65, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                                            boxShadow: isUser ? "var(--shadow-user)" : dark ? "none" : "0 2px 12px rgba(5,150,105,.06)",
+                                        }}>
+                                            {msg.text}
+                                        </div>
+                                        {!isUser && risk && !msg.isProfileQuestion && (
+                                            <div className="risk-pill" style={{ background: risk.bg, color: risk.color, border: `1px solid ${risk.color}33` }}>
+                                                <span style={{ width: 5, height: 5, borderRadius: "50%", background: risk.dot, display: "inline-block" }} />
+                                                {risk.label}
+                                                {msg.disease && msg.disease !== "Unknown" && msg.disease !== "None" && (
+                                                    <span style={{ opacity: .6 }}>{"\u00B7"} {msg.disease}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {isUser && (
+                                        <div style={{
+                                            width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+                                            background: dark ? "var(--surface)" : "var(--green-dim)",
+                                            border: "1px solid var(--border)",
+                                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+                                        }}>{"\u{1F464}"}</div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        {/* Typing indicator */}
+                        {botTyping && (
+                            <div className="msg-in" style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 14 }}>
+                                <div style={{
+                                    width: 30, height: 30, borderRadius: 10,
+                                    background: "linear-gradient(135deg,#10b981,#059669)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: 14, boxShadow: dark ? "none" : "0 2px 8px rgba(5,150,105,.2)",
+                                }}>{"\u{1FA7A}"}</div>
+                                <div style={{
+                                    padding: "13px 18px", background: "var(--bot-bubble)",
+                                    border: "1px solid var(--bot-border)",
+                                    borderRadius: "18px 18px 18px 4px",
+                                    boxShadow: dark ? "none" : "0 2px 12px rgba(5,150,105,.06)",
+                                }}>
+                                    <TypingDots />
+                                </div>
+                            </div>
+                        )}
+                        <div ref={bottomRef} />
+                    </div>
+                    {/* ── Intake chips ── */}
+                    {showChips && (
+                        <div style={{
+                            padding: "4px 16px 10px", display: "flex", gap: 8, flexWrap: "wrap",
+                            borderTop: "1px solid var(--border)", background: "var(--input-bar)",
+                        }}>
+                            {currentQ.chips.map(chip => (
+                                <button key={chip} className="intake-chip" onClick={() => handleSend(chip)}>{chip}</button>
+                            ))}
+                        </div>
+                    )}
+                    {/* ── Analyze button + summary ── */}
+                    {showAnalyze && (
+                        <>
+                            <div className="summary-card">
+                                <p style={{
+                                    margin: "0 0 8px", fontSize: 10, fontWeight: 600,
+                                    color: dark ? "#6ee7b7" : "#059669",
+                                    letterSpacing: ".07em", textTransform: "uppercase",
+                                    fontFamily: "'DM Mono',monospace",
+                                }}>Your answers</p>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 18px" }}>
+                                    {Object.entries(answers).map(([k, v]) => (
+                                        <div key={k} style={{ fontSize: 12 }}>
+                                            <span style={{ color: "var(--muted)", textTransform: "capitalize" }}>{k}: </span>
+                                            <span style={{ color: "var(--text-body)", fontWeight: 500 }}>{v}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div style={{ padding: "0 16px 14px", display: "flex", justifyContent: "center", background: "var(--input-bar)" }}>
+                                <button className="analyze-btn" onClick={handleAnalyze} disabled={loading || botTyping}>
+                                    {"\u{1F50D}"} Analyze My Symptoms
+                                </button>
+                            </div>
+                        </>
+                    )}
+                    {/* ── Input bar ── */}
+                    <div style={{
+                        borderTop: "1px solid var(--border)", padding: "10px 14px 8px",
+                        background: "var(--input-bar)", display: "flex", flexDirection: "column", gap: 8,
+                    }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                            <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+                                🖼️ Medical image upload (coming soon)
+                            </p>
+                            <button
+                                disabled
+                                style={{
+                                    border: "1px solid var(--border)", background: "var(--surface)",
+                                    color: "var(--text-body)", borderRadius: 10, padding: "8px 10px",
+                                    fontSize: 12, cursor: "not-allowed",
+                                    opacity: 0.6,
+                                }}
+                            >
+                                🖼️ Choose Image
+                            </button>
+                        </div>
+                    </div>
+                    <div style={{
+                        borderTop: "1px solid var(--border)", padding: "12px 14px",
+                        display: "flex", gap: 10, alignItems: "center",
+                        background: "var(--input-bar)",
+                    }}>
+                        <button
+                            onClick={() => {
+                                if (!recognitionRef.current) { showAlert("Speech not supported in this browser"); return; }
+                                recognitionRef.current.start();
+                            }}
+                            className={listening ? "mic-active" : ""}
+                            style={{
+                                background: listening ? (dark ? "rgba(239,68,68,.15)" : "rgba(220,38,38,.08)") : "var(--card)",
+                                border: `1px solid ${listening ? (dark ? "rgba(239,68,68,.4)" : "rgba(220,38,38,.3)") : "var(--border)"}`,
+                                color: listening ? "var(--red)" : "var(--muted)",
+                                width: 40, height: 40, borderRadius: 12,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                cursor: "pointer", fontSize: 16, flexShrink: 0, transition: "all .2s",
+                            }}
+                            title={listening ? "Listening\u2026" : "Voice input"}
+                        >{"\u{1F3A4}"}</button>
+                        <input
+                            ref={inputRef}
+                            className="hb-input"
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                            placeholder={inputLocked ? "Tap Analyze to continue\u2026" : LANG_MAP[language].placeholder}
+                            disabled={inputLocked}
+                            style={{
+                                flex: 1, background: "var(--input-bg)", border: "1px solid var(--border)",
+                                borderRadius: 12, padding: "10px 16px",
+                                fontSize: 13.5, fontFamily: "'DM Sans',sans-serif",
+                                transition: "box-shadow .2s", opacity: inputLocked ? 0.5 : 1,
+                            }}
+                        />
+                        <button
+                            className="send-btn"
+                            onClick={() => handleSend()}
+                            disabled={!input.trim() || inputLocked}
+                            style={{
+                                background: "linear-gradient(135deg,#10b981,#059669)",
+                                border: "none", borderRadius: 12, width: 42, height: 40,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                cursor: "pointer", flexShrink: 0,
+                                opacity: (!input.trim() || inputLocked) ? 0.4 : 1,
+                            }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13" />
+                                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-              </div>
-            )}
-            <div ref={listEndRef} />
-          </main>
-
-          <aside className="chat2-intel-panel">
-            <h3>AI Intelligence</h3>
-            <div className="chat2-tag-wrap">
-              {detectedSymptoms.length ? detectedSymptoms.map((s) => <span key={s}>{s}</span>) : <span>none yet</span>}
+                {/* Footer */}
+                <p style={{
+                    textAlign: "center", color: "var(--muted)", fontSize: 11,
+                    marginTop: 12, maxWidth: 780, marginLeft: "auto", marginRight: "auto",
+                }}>
+                    {"\u26A0\uFE0F"} AI-generated guidance only. Not a substitute for professional medical advice.
+                </p>
             </div>
-            <div className="chat2-meter"><label>Risk Level ({riskLabel})</label><div><span style={{ width: `${riskPercent}%` }} /></div></div>
-            <div className="chat2-meter"><label>AI Confidence</label><div><span style={{ width: `${Math.max(8, Math.min(100, aiConfidence))}%` }} /></div></div>
-            <div className="chat2-smart-actions">
-              <button onClick={() => runSmartAction("summary")} disabled={loading}>Summarize</button>
-              <button onClick={() => runSmartAction("predict")} disabled={loading}>Predict Risk</button>
-              <button onClick={() => runSmartAction("followup")} disabled={loading}>Follow-up</button>
-              <button onClick={() => runSmartAction("report")} disabled={loading}>Generate Report</button>
-            </div>
-          </aside>
-        </div>
-
-        <div className="chat2-suggestions">
-          {QUICK_REPLIES.map((q) => <button key={q} onClick={() => sendMessage(q)} disabled={loading}>{q}</button>)}
-        </div>
-
-        <div
-          className={`chat2-upload-zone ${dragActive ? "drag" : ""}`}
-          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={(e) => { e.preventDefault(); setDragActive(false); handleImageFile(e.dataTransfer.files?.[0]); }}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => handleImageFile(e.target.files?.[0])} />
-          <p>{imageAnalyzing ? "🔍 AI scanning image..." : "📎 Drag & drop image for AI detection (or click to upload)"}</p>
-          {imagePreview && <img src={imagePreview} alt="preview" />}
-        </div>
-
-        <footer className="chat2-input-bar">
-          <button className={listening ? "active" : ""} onClick={tryVoiceInput}>🎤</button>
-          <button onClick={() => fileInputRef.current?.click()}>📎</button>
-          <button onClick={() => setAiMode((m) => (m === "balanced" ? "deep" : "balanced"))}>🧠 {aiMode}</button>
-          <input
-            value={input}
-            disabled={loading}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask HealthBot anything about your symptoms..."
-            onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-          />
-          <button className="send" disabled={loading} onClick={() => sendMessage(input)}>{loading ? "…" : "➤"}</button>
-        </footer>
-      </section>
-    </div>
-  );
+        </>
+    );
 }
