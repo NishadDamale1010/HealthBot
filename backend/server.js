@@ -103,19 +103,22 @@ const PORT = process.env.PORT || 5000;
 
 async function startServer() {
   try {
-    // 🗄️ MongoDB
-    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_DB;
-    if (!mongoUri) {
-      console.warn("⚠️ MONGODB_URI not configured");
-    } else {
-      await mongoose.connect(mongoUri);
-      console.log("✅ MongoDB connected");
-    }
-
+    // 🚀 Bind port IMMEDIATELY so Render passes health check
     app.listen(PORT, () => {
       console.log(`🚀 Server running on ${PORT}`);
     });
 
+    // 🗄️ MongoDB (Connect in background)
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_DB;
+    if (!mongoUri) {
+      console.warn("⚠️ MONGODB_URI not configured");
+    } else {
+      mongoose.connect(mongoUri).then(() => {
+        console.log("✅ MongoDB connected");
+      }).catch((err) => {
+        console.error("❌ MongoDB connection error:", err.message);
+      });
+    }
   } catch (error) {
     console.error("❌ Failed to start server:", error.message);
     process.exit(1);
