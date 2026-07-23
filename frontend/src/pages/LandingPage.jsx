@@ -1,164 +1,154 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import GlassCard from "../components/shared/GlassCard";
+import AnimatedButton from "../components/shared/AnimatedButton";
+import OnboardingFlow from "../components/shared/OnboardingFlow";
+import Header from "../components/layout/Header";
 
 export default function LandingPage() {
-    const navigate = useNavigate();
-    const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
-    useEffect(() => {
-        try {
-            const u = JSON.parse(localStorage.getItem("user"));
-            if (u) setUser(u);
-        } catch (e) { }
-    }, []);
+  useEffect(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("user"));
+      if (u) setUser(u);
+    } catch (e) { }
 
-    const name = user?.name ? user.name.split(" ")[0] : "Guest";
-    const isAsha = user?.role === "ASHA_WORKER";
-
-    const quickActions = [
-        { id: "symptom", icon: "🩺", label: "Symptom Checker", link: "/chat" },
-        { id: "health", icon: "💡", label: "Health Insights", link: "/health" },
-        { id: "doctors", icon: "👨‍⚕️", label: "Find Hospitals", link: "/hospitals" },
-        { id: "emergency", icon: "🚨", label: "Emergency", link: "/chat", color: "#ef4444" },
-        { id: "ai", icon: "✨", label: "AI Suite", link: "/ai-suite" },
-        { id: "outbreak", icon: "🗺️", label: "Outbreak Map", link: "/outbreak" },
-    ];
-
-    if (isAsha) {
-        quickActions.push({ id: "asha", icon: "👩‍🍼", label: "ASHA Co-Pilot", link: "/asha-copilot", color: "#0ea5e9" });
+    if (!localStorage.getItem("onboarding_complete")) {
+      setShowOnboarding(true);
     }
+  }, []);
 
-    return (
-        <div style={{ padding: "24px 20px 100px", fontFamily: "'DM Sans', sans-serif" }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                <div>
-                    <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1e293b", margin: 0 }}>
-                        Hello, {name} 👋
-                    </h1>
-                    <p style={{ fontSize: 14, color: "#64748b", margin: "4px 0 0" }}>
-                        How can I help you today?
-                    </p>
+  const name = user?.name ? user.name.split(" ")[0] : "Guest";
+  const isAsha = user?.role === "ASHA_WORKER";
+
+  const quickActions = [
+    { id: "symptom", icon: "🩺", label: "Symptom Checker", link: "/chat", bg: "bg-primary/10 text-primary border-primary/20" },
+    { id: "health", icon: "💡", label: "Health Insights", link: "/health", bg: "bg-info/10 text-info border-info/20" },
+    { id: "doctors", icon: "👨‍⚕️", label: "Find Hospitals", link: "/hospitals", bg: "bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/20" },
+    { id: "emergency", icon: "🚨", label: "Emergency", link: "/chat", bg: "bg-[var(--color-danger)]/10 text-[var(--color-danger)] border-[var(--color-danger)]/20" },
+    { id: "ai", icon: "✨", label: "AI Suite", link: "/ai-suite", bg: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+    { id: "outbreak", icon: "🗺️", label: "Outbreak Map", link: "/outbreak", bg: "bg-teal-500/10 text-teal-500 border-teal-500/20" },
+  ];
+
+  if (isAsha) {
+    quickActions.push({ id: "asha", icon: "👩‍🍼", label: "ASHA Co-Pilot", link: "/asha-copilot", bg: "bg-sky-500/10 text-sky-500 border-sky-500/20" });
+  }
+
+  return (
+    <>
+      {showOnboarding && <OnboardingFlow onComplete={() => setShowOnboarding(false)} />}
+      
+      <div className="min-h-full pb-20 animate-fadeIn relative">
+        <Header title="HealthBot" />
+        
+        {/* Hero Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none"></div>
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-32 -left-24 w-48 h-48 bg-info/20 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="px-5 pt-6 relative z-10">
+          {/* Welcome Header */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--text-primary)]">
+                Hello, {name} 👋
+              </h1>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
+                How can I help you today?
+              </p>
+            </div>
+            <button className="w-10 h-10 rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center text-lg relative hover:border-primary transition-colors">
+              🔔
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-[var(--color-danger)] rounded-full border-2 border-[var(--bg-card)] animate-pulse"></span>
+            </button>
+          </div>
+
+          {/* Health Score Glass Card */}
+          <GlassCard className="mb-6 border-t-4 border-t-primary">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <div className="text-xs text-[var(--text-secondary)] font-medium mb-1">Health Score</div>
+                <div className="flex items-baseline gap-1 text-primary">
+                  <span className="text-4xl font-bold">85</span>
+                  <span className="text-sm text-[var(--text-secondary)] font-medium">/100</span>
                 </div>
-                <div style={{ position: "relative" }}>
-                    <div style={{
-                        width: 40, height: 40, borderRadius: "50%", background: "#f1f5f9",
-                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20
-                    }}>🔔</div>
-                    <div style={{
-                        position: "absolute", top: 8, right: 10, width: 8, height: 8,
-                        background: "#ef4444", borderRadius: "50%", border: "2px solid #f8fafc"
-                    }} />
-                </div>
+                <div className="text-xs font-semibold text-primary mt-1 bg-primary/10 inline-block px-2 py-0.5 rounded-full">Great!</div>
+              </div>
+              <div className="w-16 h-16 rounded-[var(--radius-xl)] bg-primary/10 flex items-center justify-center text-3xl animate-float">
+                💚
+              </div>
             </div>
 
-            {/* Health Score Card */}
-            <div style={{
-                background: "#ffffff", borderRadius: 20, padding: 20,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.05)", marginBottom: 24,
-                border: "1px solid #f1f5f9"
-            }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                    <div>
-                        <div style={{ fontSize: 13, color: "#64748b", fontWeight: 500, marginBottom: 4 }}>Health Score</div>
-                        <div style={{ fontSize: 32, fontWeight: 700, color: "#10b981", display: "flex", alignItems: "baseline", gap: 4 }}>
-                            85<span style={{ fontSize: 14, color: "#94a3b8", fontWeight: 500 }}>/100</span>
-                        </div>
-                        <div style={{ fontSize: 13, color: "#10b981", fontWeight: 600 }}>Great!</div>
-                    </div>
-                    <div style={{
-                        width: 64, height: 64, borderRadius: 20, background: "#ecfdf5",
-                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32,
-                        color: "#10b981"
-                    }}>
-                        💚
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
-                    <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Steps</div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: "#1e293b" }}>7,842</div>
-                        <div style={{ fontSize: 10, color: "#94a3b8" }}>/10,000</div>
-                    </div>
-                    <div style={{ width: 1, background: "#f1f5f9" }} />
-                    <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Water</div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: "#1e293b" }}>6/8</div>
-                        <div style={{ fontSize: 10, color: "#94a3b8" }}>Glasses</div>
-                    </div>
-                    <div style={{ width: 1, background: "#f1f5f9" }} />
-                    <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Sleep</div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: "#1e293b" }}>7h 26m</div>
-                        <div style={{ fontSize: 10, color: "#10b981", fontWeight: 500 }}>Good</div>
-                    </div>
-                </div>
+            <div className="flex justify-between border-t border-[var(--border-color)] pt-4">
+              <div className="text-center">
+                <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-semibold mb-1">Steps</div>
+                <div className="text-sm font-bold text-[var(--text-primary)]">7,842</div>
+              </div>
+              <div className="w-px bg-[var(--border-color)]"></div>
+              <div className="text-center">
+                <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-semibold mb-1">Water</div>
+                <div className="text-sm font-bold text-[var(--text-primary)]">6/8</div>
+              </div>
+              <div className="w-px bg-[var(--border-color)]"></div>
+              <div className="text-center">
+                <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-semibold mb-1">Sleep</div>
+                <div className="text-sm font-bold text-primary">7h 26m</div>
+              </div>
             </div>
+          </GlassCard>
 
-            {/* Quick Actions */}
-            <div style={{ marginBottom: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", margin: 0 }}>Quick Actions</h2>
-                    <Link to="/ai-suite" style={{ fontSize: 12, color: "#10b981", fontWeight: 600, textDecoration: "none" }}>View All</Link>
-                </div>
-                
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                    {quickActions.slice(0, 4).map(action => (
-                        <div key={action.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => navigate(action.link)}>
-                            <div style={{
-                                width: 56, height: 56, borderRadius: 16,
-                                background: action.color ? `${action.color}15` : "#f1f5f9",
-                                color: action.color || "#10b981",
-                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
-                                border: `1px solid ${action.color ? `${action.color}30` : "#e2e8f0"}`
-                            }}>
-                                {action.icon}
-                            </div>
-                            <div style={{ fontSize: 11, fontWeight: 500, color: "#475569", textAlign: "center", lineHeight: 1.2 }}>
-                                {action.label}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 16 }}>
-                    {quickActions.slice(4).map(action => (
-                        <div key={action.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => navigate(action.link)}>
-                            <div style={{
-                                width: 56, height: 56, borderRadius: 16,
-                                background: action.color ? `${action.color}15` : "#f1f5f9",
-                                color: action.color || "#10b981",
-                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
-                                border: `1px solid ${action.color ? `${action.color}30` : "#e2e8f0"}`
-                            }}>
-                                {action.icon}
-                            </div>
-                            <div style={{ fontSize: 11, fontWeight: 500, color: "#475569", textAlign: "center", lineHeight: 1.2 }}>
-                                {action.label}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+          {/* Start Chat CTA */}
+          <div className="mb-8">
+            <AnimatedButton 
+              onClick={() => navigate('/chat')}
+              className="w-full py-4 text-lg font-bold shadow-lg shadow-primary/30 flex items-center justify-center gap-2"
+            >
+              <span>🤖</span> Ask AI Health Assistant
+            </AnimatedButton>
+          </div>
 
-            {/* Daily Tip */}
-            <div style={{
-                background: "linear-gradient(135deg, #10b981, #059669)",
-                borderRadius: 20, padding: 20, color: "white",
-                position: "relative", overflow: "hidden",
-                boxShadow: "0 8px 24px rgba(16, 185, 129, 0.25)"
-            }}>
-                <div style={{ position: "absolute", top: -20, right: -20, fontSize: 100, opacity: 0.1 }}>🍋</div>
-                <div style={{ position: "relative", zIndex: 1 }}>
-                    <div style={{ display: "inline-block", background: "rgba(255,255,255,0.2)", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", marginBottom: 12 }}>
-                        DAILY TIP
-                    </div>
-                    <p style={{ fontSize: 14, lineHeight: 1.5, margin: 0, fontWeight: 500, maxWidth: "85%" }}>
-                        Drink a glass of warm water with lemon in the morning. It helps boost your metabolism!
-                    </p>
-                </div>
+          {/* Quick Actions */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Quick Actions</h2>
+              <Link to="/ai-suite" className="text-xs font-semibold text-primary hover:underline">View All</Link>
             </div>
+            
+            <div className="grid grid-cols-4 gap-3">
+              {quickActions.map(action => (
+                <div 
+                  key={action.id} 
+                  className="flex flex-col items-center gap-2 cursor-pointer group" 
+                  onClick={() => navigate(action.link)}
+                >
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl border transition-all duration-300 group-hover:scale-105 group-hover:shadow-md ${action.bg}`}>
+                    {action.icon}
+                  </div>
+                  <div className="text-[10px] font-semibold text-[var(--text-secondary)] text-center leading-tight group-hover:text-primary transition-colors">
+                    {action.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Daily Tip */}
+          <div className="bg-gradient-to-br from-primary to-[var(--color-primary-dark)] rounded-[var(--radius-xl)] p-5 text-white relative overflow-hidden shadow-lg shadow-primary/20">
+            <div className="absolute -top-4 -right-4 text-8xl opacity-10 rotate-12">🍋</div>
+            <div className="relative z-10">
+              <div className="inline-block bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold tracking-wider mb-3">
+                DAILY TIP
+              </div>
+              <p className="text-sm leading-relaxed font-medium max-w-[85%] text-emerald-50">
+                Drink a glass of warm water with lemon in the morning. It helps boost your metabolism!
+              </p>
+            </div>
+          </div>
         </div>
-    );
+      </div>
+    </>
+  );
 }
