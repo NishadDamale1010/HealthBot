@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import axios from 'axios';
+import API from '../services/api';
 
 export function useChat() {
   const [messages, setMessages] = useState([]);
@@ -24,7 +24,7 @@ export function useChat() {
     setError(null);
 
     try {
-      const response = await axios.post('/api/chat', {
+      const response = await API.post('/api/chat', {
         message: text,
         sessionId: sessionIdRef.current,
         ...additionalData
