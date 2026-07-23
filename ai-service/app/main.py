@@ -1,39 +1,45 @@
+import asyncio
+import threading
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.routers import predict, nlp, emergency, health, questions
 from app.rag.router import router as rag_router
-from app.rag.ingest import ingest_documents
-from app.training.train_model import train
-from app.models.disease_predictor import predictor
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Train ML models if they don't exist
+# Global readiness flag
+_ready = False
+
+def _init_models():
+    """Heavy initialization in a background thread so the port opens immediately."""
+    global _ready
     try:
+        from app.training.train_model import train
+        from app.models.disease_predictor import predictor
+        
         predictor.load_models()
         if not predictor.xgb_model:
             print("Models not found, training...")
             train()
             predictor.load_models()
+        print("✅ ML models loaded successfully")
     except Exception as e:
-        print(f"ML startup error: {e}")
-    
-    # Ingest RAG documents if vector store is empty
+        print(f"⚠️ ML startup error (non-fatal): {e}")
+
     try:
+        from app.rag.ingest import ingest_documents
         ingest_documents()
+        print("✅ RAG knowledge base ingested successfully")
     except Exception as e:
-        print(f"RAG ingestion error: {e}")
-    
-    yield
+        print(f"⚠️ RAG ingestion error (non-fatal): {e}")
+
+    _ready = True
+    print("🚀 AI Service fully ready!")
 
 app = FastAPI(
     title="HealthBot AI Service",
     description="Combined ML prediction and RAG knowledge retrieval service for HealthBot",
     version="2.0.0",
-    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -56,7 +62,14 @@ app.include_router(rag_router)
 
 @app.get("/healthz")
 def health_check():
-    return {"status": "ok", "service": "healthbot-ai", "version": "2.0.0"}
+    """Health check — returns 200 immediately so Render detects the port."""
+    return {"status": "ok", "ready": _ready, "service": "healthbot-ai", "version": "2.0.0"}
+
+@app.on_event("startup")
+async def startup_event():
+    """Start heavy model loading in background thread so the server binds the port first."""
+    thread = threading.Thread(target=_init_models, daemon=True)
+    thread.start()
 
 if __name__ == "__main__":
     import uvicorn
