@@ -5,6 +5,10 @@ const mongoose = require("mongoose");
 
 const User = require("../models/user");
 const ChatMessage = require("../models/chatMessage");
+const mlClient = require('../services/mlClient');
+const sessionManager = require('../services/sessionManager');
+const emergencyService = require('../services/emergencyService');
+const Prediction = require('../models/prediction');
 
 // ─────────────────────────────────────────────
 // 🔧 Constants
@@ -455,11 +459,37 @@ Risk: Low`;
     const originalComplaint = mem.lastHealthMessage || msgEn;
     const profileText = buildProfileText(mem.profile, userDoc);
 
+    // Emergency check
+    const emergencyResult = emergencyService.evaluateEmergency(originalComplaint);
+    if (emergencyResult.isEmergency) {
+       const emergencyReply = `⚠️ **EMERGENCY DETECTED: ${emergencyResult.category}** (Severity: ${emergencyResult.severityScore}/100)\n\nWhat you should do immediately:\n- ${emergencyResult.instructions.join('\n- ')}\n\nEmergency Numbers:\n${emergencyResult.emergencyNumbers.join(', ')}\n\nRisk: Critical\n\n⚠️ This is not medical advice. Consult a healthcare provider.`;
+       await persistMessages(dbUserId, message, emergencyReply, lang);
+       return {
+         reply: emergencyReply,
+         prediction: { disease: "Emergency", risk: "Critical", confidence: 1.0, symptomsDetected: symptoms },
+         messageType: "prediction"
+       };
+    }
+
     let prediction = null;
-    try {
-      const predInput = symptoms.length ? symptoms.join(" ") : originalComplaint;
-      prediction = predictDisease(predInput);
-    } catch { prediction = null; }
+    let mlUsed = false;
+    
+    // Try ML Client
+    const isMlAvail = await mlClient.isAvailable();
+    if (isMlAvail) {
+        const mlResult = await mlClient.predictFromText(symptoms.length ? symptoms.join(" ") : originalComplaint);
+        if (mlResult && mlResult.confidence > 0.6) {
+           prediction = mlResult;
+           mlUsed = true;
+        }
+    }
+    
+    if (!prediction) {
+      try {
+        const predInput = symptoms.length ? symptoms.join(" ") : originalComplaint;
+        prediction = predictDisease(predInput);
+      } catch { prediction = null; }
+    }
 
     const diseaseText = prediction
       ? `${prediction.disease} (confidence: ${prediction.confidence})`
@@ -514,19 +544,41 @@ End with: Risk: Low / Medium / High`;
     const resolvedPredRisk = predRisk || detectSeverity(originalComplaint);
     reply = predClean;
 
+    // Save prediction in DB
+    try {
+       const dbPred = new Prediction({
+           userId: dbUserId !== "default" ? dbUserId : null,
+           symptoms: symptoms,
+           topDisease: prediction?.disease || "Unknown",
+           confidence: prediction?.confidence || 0,
+           riskLevel: resolvedPredRisk,
+           matchedSymptoms: prediction?.symptomsDetected || [],
+           topFive: prediction?.topFive || []
+       });
+       await dbPred.save();
+    } catch (e) { console.error('Save Prediction err:', e); }
+
     if (lang !== "en") reply = await translateText(reply, lang);
 
     mem.history.push({ role: "user", content: msgEn });
     mem.history.push({ role: "assistant", content: reply });
     mem.stage = "done";
 
-    const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+    const finalReply = `${reply}\n\n⚠️ This is not medical advice. Consult a healthcare provider.`;
     await persistMessages(dbUserId, message, finalReply, lang);
 
-    // Use parsed risk from AI reply (most accurate), fall back to rule-based severity
     const predPrediction = prediction
       ? { ...prediction, risk: resolvedPredRisk }
       : { disease: "Unknown", risk: resolvedPredRisk, confidence: "0.00", symptomsDetected: [] };
+      
+    // Include extra ML info if present
+    if (mlUsed && prediction.shapValues) {
+        predPrediction.explainability = {
+            shapValues: prediction.shapValues,
+            topFive: prediction.topFive,
+            missingSymptoms: prediction.missingSymptoms
+        };
+    }
 
     return {
       reply: finalReply,

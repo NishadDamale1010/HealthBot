@@ -1,0 +1,71 @@
+{
+  "cardiac": [
+    "chest pain", "heart attack", "crushing chest", "heart pain",
+    "chest tightness", "pressure in chest", "cardiac arrest",
+    "heart stopped", "angina", "chest squeezing", "left arm pain with chest",
+    "heart failure", "myocardial infarction", "sudden chest pain"
+  ],
+  "respiratory": [
+    "can't breathe", "choking", "severe asthma attack", "not breathing",
+    "stopped breathing", "suffocating", "respiratory failure",
+    "airway blocked", "anaphylaxis", "severe breathing difficulty",
+    "gasping for air", "blue lips", "cyanosis", "asphyxiation",
+    "drowning", "inhaled something", "throat swelling shut"
+  ],
+  "neurological": [
+    "stroke", "seizure", "unconscious", "not responding",
+    "sudden confusion", "face drooping", "sudden numbness",
+    "can't speak suddenly", "sudden severe headache",
+    "loss of consciousness", "convulsions", "epileptic fit",
+    "fainting", "passed out", "collapsed", "brain hemorrhage",
+    "one side paralyzed", "sudden vision loss", "meningitis symptoms"
+  ],
+  "trauma": [
+    "severe bleeding", "heavy bleeding", "broken bone", "head injury",
+    "major accident", "deep wound", "impaled", "crush injury",
+    "severe burn", "third degree burn", "stabbed", "shot",
+    "compound fracture", "bone sticking out", "massive trauma",
+    "fell from height", "car accident injury", "spinal injury"
+  ],
+  "poisoning": [
+    "overdose", "poisoned", "swallowed poison", "chemical exposure",
+    "drug overdose", "took too many pills", "ingested bleach",
+    "carbon monoxide", "snake bite", "insect sting allergic",
+    "food poisoning severe", "mushroom poisoning", "alcohol poisoning",
+    "pesticide ingestion", "acid ingestion"
+  ],
+  "mental_health": [
+    "suicidal", "want to kill myself", "self harm", "cutting myself",
+    "want to die", "ending my life", "suicide attempt",
+    "severe panic attack", "psychotic episode", "hearing voices",
+    "going to hurt myself", "don't want to live", "harming myself",
+    "suicidal thoughts", "planning suicide"
+  ],
+  "pediatric": [
+    "baby not breathing", "infant high fever", "newborn emergency",
+    "child unconscious", "child seizure", "baby choking",
+    "infant not responding", "child severe burn", "baby blue",
+    "newborn not feeding", "child swallowed something",
+    "toddler fell", "child drowning", "baby convulsions",
+    "child allergic reaction severe"
+  ],
+  "obstetric": [
+    "pregnancy bleeding", "heavy bleeding pregnant", "water broke early",
+    "baby not moving", "preterm labor", "eclampsia",
+    "pregnancy seizure", "umbilical cord prolapse",
+    "placental abruption", "ectopic pregnancy symptoms",
+    "severe pregnancy pain", "postpartum hemorrhage",
+    "pregnancy high blood pressure severe"
+  ],
+  "allergic": [
+    "anaphylactic shock", "severe allergic reaction",
+    "throat closing up", "swelling tongue", "whole body swelling",
+    "severe hives", "can't swallow", "epipen needed",
+    "allergic reaction severe", "face swelling rapidly"
+  ],
+  "abdominal": [
+    "vomiting blood", "blood in stool heavy", "severe abdominal pain sudden",
+    "appendix burst", "intestinal obstruction", "bowel perforation",
+    "pancreatitis severe", "ruptured organ"
+  ]
+}

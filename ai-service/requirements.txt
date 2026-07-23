@@ -1,0 +1,14 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+pydantic-settings
+scikit-learn
+xgboost
+numpy
+pandas
+shap
+joblib
+chromadb>=0.4.0
+sentence-transformers>=2.2.2
+markdown>=3.4.0
+gunicorn

@@ -4,6 +4,13 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
+
+const { securityHeaders, sanitizeInput } = require("./src/middleware/security");
+const { generalLimiter, authLimiter, chatLimiter, predictLimiter } = require("./src/middleware/rateLimiter");
+
 
 const authRoutes = require("./src/routes/auth.route");
 const chatRoutes = require("./src/routes/chat.routes");
@@ -13,6 +20,8 @@ const seasonalRoutes = require("./src/routes/seasonal.routes");
 const healthRoutes = require("./src/routes/health.routes");
 const hospitalRoutes = require("./src/routes/hospital.routes");
 const intelligenceRoutes = require("./src/routes/intelligence.routes");
+const ragRoutes = require("./src/routes/rag.routes");
+const feedbackRoutes = require("./src/routes/feedback.routes");
 
 // 🏥 SIH Blueprint Feature Routes
 const abdmRoutes = require("./src/features/abdm/abdm.routes");
@@ -27,6 +36,11 @@ const app = express();
 app.set("trust proxy", 1);
 
 // 🔐 Middleware
+app.use(securityHeaders);
+app.use(compression());
+app.use(morgan("combined"));
+app.use(sanitizeInput);
+app.use(generalLimiter);
 app.disable("x-powered-by");
 const allowedOrigin = process.env.FRONTEND_ORIGIN || "*";
 app.use(cors({
@@ -43,14 +57,16 @@ app.use((req, res, next) => {
 });
 
 // 📦 Routes
-app.use("/api/predict", predictRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/chat", chatRoutes);
+app.use("/api/predict", predictLimiter, predictRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/chat", chatLimiter, chatRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/seasonal-alert", seasonalRoutes);
 app.use("/api/health" ,healthRoutes)
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
+app.use("/api/rag", ragRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 // 🏥 SIH Blueprint Feature Routes
 app.use("/api/abdm", abdmRoutes);
