@@ -12,7 +12,7 @@ const Prediction = require('../models/prediction');
 // ─────────────────────────────────────────────
 // 🔧 Constants
 // ─────────────────────────────────────────────
-const MAX_HISTORY = 6;
+const MAX_HISTORY = 8;
 const MAX_INPUT_LENGTH = 1000;
 const CHAT_HISTORY_LOAD = 10;
 
@@ -26,55 +26,14 @@ function initMemory(userId) {
     userMemory[userId] = {
       history: [],
       profile: {},
-      profileStep: -1,
-      pendingMessage: null,
-      stage: "profile",
+      stage: "clarify_symptoms", // New starting stage
       lastSymptoms: [],
       lastHealthMessage: null,
-      dbHistoryLoaded: false,   // ✅ FIX: separate flag, NOT tied to history.length
+      dbHistoryLoaded: false,
       dbHistorySummary: "",
     };
   }
   return userMemory[userId];
-}
-
-// ─────────────────────────────────────────────
-// 📋 Profile questions
-// ─────────────────────────────────────────────
-const PROFILE_QUESTIONS = [
-  { key: "age", question: "Thanks for sharing. I’ll ask 5 quick questions so I can guide you better.\n\n1️⃣ What is your age?" },
-  { key: "gender", question: "2️⃣ What gender do you identify with? (Male / Female / Other)" },
-  { key: "conditions", question: "3️⃣ Do you have any existing medical conditions?\n(Example: diabetes, BP, asthma — or type 'None')" },
-  { key: "allergies", question: "4️⃣ Do you have any known allergies?\n(If none, type 'None')" },
-  { key: "medications", question: "5️⃣ Are you currently taking any regular medicines?\n(If none, type 'None')" },
-];
-
-function isProfileComplete(mem) {
-  return mem.profileStep >= PROFILE_QUESTIONS.length;
-}
-
-function recordProfileAnswer(mem, answer) {
-  const q = PROFILE_QUESTIONS[mem.profileStep];
-  if (!q) return;
-  let value = answer.trim();
-
-  // ✅ FIX: normalize gender to match User model allowed values
-  if (q.key === "gender") {
-    const map = {
-      male: "male", m: "male",
-      female: "female", f: "female",
-      other: "other", o: "other",
-    };
-    value = map[value.toLowerCase()] || "other";
-  }
-
-  mem.profile[q.key] = value;
-  mem.profileStep += 1;
-}
-
-function dbProfileComplete(userDoc) {
-  if (!userDoc) return false;
-  return !!(userDoc.age && userDoc.gender);
 }
 
 // ─────────────────────────────────────────────
@@ -172,7 +131,7 @@ async function loadDbChatHistory(dbUserId) {
 
     if (!past.length) return { messages: [], summary: "" };
 
-    past.reverse(); // oldest first for AI context
+    past.reverse();
 
     const messages = past.map((m) => ({
       role: m.role === "assistant" ? "assistant" : "user",
@@ -195,8 +154,8 @@ async function loadDbChatHistory(dbUserId) {
 // ─────────────────────────────────────────────
 function detectIntent(message) {
   const msg = message.toLowerCase();
-  if (["hi", "hello", "hey", "hii", "good morning"].some((g) => msg.includes(g))) return "greeting";
-  if (["how are you", "what's up", "who are you"].some((c) => msg.includes(c))) return "casual";
+  if (["hi", "hello", "hey", "hii", "good morning"].some((g) => msg.includes(g)) && message.length < 20) return "greeting";
+  if (["how are you", "what's up", "who are you"].some((c) => msg.includes(c)) && message.length < 30) return "casual";
   return "medical";
 }
 
@@ -216,10 +175,6 @@ function detectSeverity(message) {
   return SEVERE_WORDS.some((w) => message.toLowerCase().includes(w)) ? "High" : "Low";
 }
 
-/**
- * Parse "Risk: High/Medium/Low" from AI reply text and strip it.
- * Returns { cleanReply, parsedRisk }.
- */
 function parseAndStripRisk(reply) {
   const riskMatch = reply.match(/\n*\s*Risk:\s*(High|Medium|Low)\s*$/i);
   const parsedRisk = riskMatch ? riskMatch[1].charAt(0).toUpperCase() + riskMatch[1].slice(1).toLowerCase() : null;
@@ -227,32 +182,13 @@ function parseAndStripRisk(reply) {
   return { cleanReply, parsedRisk };
 }
 
-const SYMPTOM_QUESTIONS = {
-  fever: ["How high is your temperature?", "How long have you had the fever?"],
-  headache: ["Is the pain constant or does it come and go?", "Do you feel nausea or sensitivity to light?"],
-  cold: ["Do you have a runny or blocked nose?", "Do you have a sore throat?"],
-  cough: ["Is your cough dry or producing mucus?", "How many days have you had the cough?"],
-  pain: ["On a scale of 1–10, how severe is the pain?", "Is the pain in one spot or does it spread?"],
-  vomiting: ["How many times have you vomited?", "Did it start suddenly or gradually?"],
-  fatigue: ["Are you sleeping normally?", "Is the fatigue getting worse over time?"],
-  default: ["How long have you been experiencing this?", "Do you have any other symptoms?"],
-};
-
-function getRuleBasedFollowup(symptoms, message) {
-  const lower = message.toLowerCase();
-  for (const [key, questions] of Object.entries(SYMPTOM_QUESTIONS)) {
-    if (key !== "default" && (symptoms.includes(key) || lower.includes(key))) return questions;
-  }
-  return SYMPTOM_QUESTIONS.default;
-}
-
-function buildProfileText(memProfile, userDoc) {
+function buildProfileText(userDoc) {
   const lines = [];
-  const age = memProfile?.age || userDoc?.age;
-  const gender = memProfile?.gender || userDoc?.gender;
-  const conditions = memProfile?.conditions || userDoc?.existingMedicalConditions?.join(", ");
-  const allergies = memProfile?.allergies || userDoc?.allergies?.join(", ");
-  const medications = memProfile?.medications || userDoc?.medications?.join(", ");
+  const age = userDoc?.age;
+  const gender = userDoc?.gender;
+  const conditions = userDoc?.existingMedicalConditions?.join(", ");
+  const allergies = userDoc?.allergies?.join(", ");
+  const medications = userDoc?.medications?.join(", ");
   if (age) lines.push(`Age: ${age}`);
   if (gender) lines.push(`Gender: ${gender}`);
   if (conditions && conditions.toLowerCase() !== "none") lines.push(`Existing conditions: ${conditions}`);
@@ -286,7 +222,7 @@ async function persistMessages(dbUserId, userMsg, botMsg, lang) {
 }
 
 // ─────────────────────────────────────────────
-// 🧠 MAIN LOGIC
+// 🧠 MAIN LOGIC (4-Stage Interview)
 // ─────────────────────────────────────────────
 async function getAIReply(message, userId = "default", forcedLang = null) {
 
@@ -301,14 +237,14 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
   const intent = detectIntent(message);
   if (intent === "greeting") {
     return {
-      reply: "👋 Hi! I'm your AI Health Assistant. Tell me your symptoms and I'll help you.",
+      reply: "Hi! I'm your Health AI assistant 🤖\nI'll ask you a few questions to understand your symptoms better.\n\nLet's get started. Please describe your main problem in your own words.",
       prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] },
       messageType: "greeting",
     };
   }
   if (intent === "casual") {
     return {
-      reply: "😊 I'm here to help with health-related questions. Tell me your symptoms.",
+      reply: "😊 I'm here to help with health-related questions. Tell me what's bothering you.",
       prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] },
       messageType: "casual",
     };
@@ -320,252 +256,215 @@ async function getAIReply(message, userId = "default", forcedLang = null) {
   const msgEn = lang === "en" ? message : await translateText(message, "en");
   const lower = msgEn.toLowerCase();
 
-  if (isEmergency(lower)) {
-    let msg = "🚨 This may be a medical emergency. Please go to the nearest hospital immediately.";
+  // Emergency Check First
+  const emergencyResult = emergencyService.evaluateEmergency(msgEn);
+  if (emergencyResult.isEmergency || isEmergency(lower)) {
+    const eCat = emergencyResult.category || "Critical Condition";
+    const eSev = emergencyResult.severityScore || 90;
+    const eInst = emergencyResult.instructions?.join('\n- ') || "Seek immediate medical attention.";
+    
+    let msg = `⚠️ **EMERGENCY DETECTED: ${eCat}**\n\nWhat you should do immediately:\n- ${eInst}\n\n🚨 Please go to the nearest hospital immediately or CALL 108.`;
     if (lang !== "en") msg = await translateText(msg, lang);
     return {
       reply: `${msg}\n\n⚠️ This is not medical advice.`,
-      prediction: { disease: "Unknown", risk: "High", confidence: "0.00", symptomsDetected: [] },
+      prediction: { disease: "Emergency", risk: "Critical", confidence: 1.0, symptomsDetected: [] },
       messageType: "emergency",
     };
   }
 
-  // ✅ FIX: use dbHistoryLoaded flag — not history.length
-  // This means DB history loads exactly once per server session per user,
-  // regardless of whether they already have in-memory messages.
   if (!mem.dbHistoryLoaded && dbUserId) {
     const { messages: dbMessages, summary: dbSummary } = await loadDbChatHistory(dbUserId);
-    // Prepend DB history before any in-memory messages built this session
     mem.history = [...dbMessages.slice(-MAX_HISTORY), ...mem.history].slice(-MAX_HISTORY);
     mem.dbHistorySummary = dbSummary;
-    mem.dbHistoryLoaded = true;  // never reload again this server session
-    console.log(`📜 Loaded ${dbMessages.length} past messages from DB for user ${userId}`);
+    mem.dbHistoryLoaded = true;
   }
 
-  // ── Skip profile if DB already has age + gender ──
-  if (dbProfileComplete(userDoc) && mem.profileStep === -1) {
-    mem.profileStep = PROFILE_QUESTIONS.length;
-    mem.stage = "followup";
-  }
+  const profileText = buildProfileText(userDoc);
+  const symptoms = await extractSymptoms(msgEn);
 
   // ─────────────────────────────────────────────
-  // STAGE 1: PROFILE COLLECTION
+  // STAGE 1: CLARIFY SYMPTOMS (Ask related symptoms)
   // ─────────────────────────────────────────────
-  if (mem.stage === "profile" && !isProfileComplete(mem)) {
+  if (mem.stage === "clarify_symptoms") {
+    mem.lastHealthMessage = msgEn;
+    mem.lastSymptoms = symptoms;
 
-    if (mem.profileStep === -1) {
-      mem.pendingMessage = msgEn;
-      mem.profileStep = 0;
-      const q = PROFILE_QUESTIONS[0];
-      let reply = q.question;
-      if (lang !== "en") reply = await translateText(reply, lang);
-      const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
-      await persistMessages(dbUserId, message, finalReply, lang);
-      return { reply: finalReply, prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] }, messageType: "profile" };
-    }
+    const prompt = `You are a smart, empathetic Health AI assistant. 
+Patient profile: ${profileText}
+Patient's main problem: "${msgEn}"
 
-    recordProfileAnswer(mem, msgEn);
+Your goal is to identify related symptoms to narrow down possibilities.
+Respond EXACTLY in this format:
+I'm sorry to hear that. I'll need a bit more information.
+❓ Do you also have any of these?
+• [Related symptom 1]
+• [Related symptom 2]
+• [Related symptom 3]
+• [Related symptom 4]
 
-    if (!isProfileComplete(mem)) {
-      const nextQ = PROFILE_QUESTIONS[mem.profileStep];
-      let reply = nextQ.question;
-      if (lang !== "en") reply = await translateText(reply, lang);
-      const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
-      await persistMessages(dbUserId, message, finalReply, lang);
-      return { reply: finalReply, prediction: { disease: "None", risk: "Low", confidence: "0.00", symptomsDetected: [] }, messageType: "profile" };
-    }
-
-    mem.stage = "followup";
-  }
-
-  // ─────────────────────────────────────────────
-  // STAGE 2: FOLLOW-UP QUESTIONS
-  // ─────────────────────────────────────────────
-  if (mem.stage === "followup") {
-    const healthMessage = mem.pendingMessage || msgEn;
-    mem.pendingMessage = null;
-
-    const symptoms = await extractSymptoms(healthMessage);
-    const profileText = buildProfileText(mem.profile, userDoc);
-
-    const historyContext = mem.dbHistorySummary
-      ? `\n\nPast conversation history with this patient:\n${mem.dbHistorySummary}\n\nUse this history to understand recurring symptoms, previous conditions, and continuity of care.`
-      : "";
-
-    const followupPrompt = `You are a caring medical triage assistant. Your ONLY job right now is to ask 2 follow-up questions.
-
-Patient profile:
-${profileText}${historyContext}
-
-Patient complaint: "${healthMessage}"
-
-STRICT RULES — you MUST follow ALL of these:
-- Do NOT mention any disease or condition name
-- Do NOT give precautions or advice
-- Do NOT write "Most likely" or "possible causes"
-- Keep language very simple and supportive
-- Write ONLY 2 numbered questions (one sentence each)
-- End with Risk level
-
-Respond in EXACTLY this format:
-1. [your first question]?
-2. [your second question]?
-
+(Only ask about symptoms logically related to their complaint. Do not mention diseases.)
 Risk: Low`;
 
-    let reply = await smartAI([
-      { role: "system", content: followupPrompt },
-      ...mem.history.slice(-MAX_HISTORY),
-      { role: "user", content: `Patient says: ${healthMessage}` },
-    ]);
-
-    const badWords = ["most likely", "possible causes", "precaution", "flu", "cold", "infection", "diagnosis"];
-    const repliedBadly = badWords.some((w) => reply?.toLowerCase().includes(w));
-
-    if (!reply || !reply.includes("?") || repliedBadly) {
-      const [q1, q2] = getRuleBasedFollowup(symptoms, healthMessage);
-      reply = `1. ${q1}\n2. ${q2}\n\nRisk: Low`;
+    let reply = await smartAI([{ role: "system", content: prompt }]);
+    if (!reply) {
+      reply = `I'm sorry to hear that. I'll need a bit more information.\n❓ Do you also have any of these?\n• Fever or chills\n• Body ache\n• Nausea or vomiting\n• Fatigue\n\nRisk: Low`;
     }
 
-    // Parse and strip "Risk: ..." from reply text so the frontend badge is the single source of truth
-    const { cleanReply: followupClean, parsedRisk: followupRisk } = parseAndStripRisk(reply);
-    const resolvedFollowupRisk = followupRisk || detectSeverity(healthMessage);
-    reply = followupClean;
+    const { cleanReply, parsedRisk } = parseAndStripRisk(reply);
+    reply = cleanReply;
 
     if (lang !== "en") reply = await translateText(reply, lang);
 
-    mem.history.push({ role: "user", content: healthMessage });
+    mem.history.push({ role: "user", content: msgEn });
     mem.history.push({ role: "assistant", content: reply });
-    mem.stage = "prediction";
-    mem.lastSymptoms = symptoms;
-    mem.lastHealthMessage = healthMessage;
+    mem.stage = "dig_deeper";
 
-    const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
+    const finalReply = `${reply}`;
     await persistMessages(dbUserId, message, finalReply, lang);
 
     return {
       reply: finalReply,
-      prediction: { disease: "None", risk: resolvedFollowupRisk, confidence: "0.00", symptomsDetected: symptoms },
-      messageType: "followup",
+      prediction: { disease: "None", risk: parsedRisk || "Low", confidence: "0.00", symptomsDetected: symptoms },
+      messageType: "clarify",
     };
   }
 
   // ─────────────────────────────────────────────
-  // STAGE 3: PREDICTION
+  // STAGE 2: DIG DEEPER (Ask severity, timeline, context)
   // ─────────────────────────────────────────────
-  if (mem.stage === "prediction") {
-    const symptoms = mem.lastSymptoms || await extractSymptoms(msgEn);
-    const originalComplaint = mem.lastHealthMessage || msgEn;
-    const profileText = buildProfileText(mem.profile, userDoc);
+  if (mem.stage === "dig_deeper") {
+    const combinedSymptoms = [...mem.lastSymptoms, ...symptoms];
+    mem.lastSymptoms = [...new Set(combinedSymptoms)]; // merge and deduplicate
 
-    // Emergency check
-    const emergencyResult = emergencyService.evaluateEmergency(originalComplaint);
-    if (emergencyResult.isEmergency) {
-       const emergencyReply = `⚠️ **EMERGENCY DETECTED: ${emergencyResult.category}** (Severity: ${emergencyResult.severityScore}/100)\n\nWhat you should do immediately:\n- ${emergencyResult.instructions.join('\n- ')}\n\nEmergency Numbers:\n${emergencyResult.emergencyNumbers.join(', ')}\n\nRisk: Critical\n\n⚠️ This is not medical advice. Consult a healthcare provider.`;
-       await persistMessages(dbUserId, message, emergencyReply, lang);
-       return {
-         reply: emergencyReply,
-         prediction: { disease: "Emergency", risk: "Critical", confidence: 1.0, symptomsDetected: symptoms },
-         messageType: "prediction"
-       };
-    }
+    const prompt = `You are a smart Health AI.
+Patient's initial complaint: "${mem.lastHealthMessage}"
+Patient's response to related symptoms: "${msgEn}"
 
-    let prediction = null;
-    let mlUsed = false;
-    
-    try {
-        const predInput = symptoms.length ? symptoms.join(" ") : originalComplaint;
-        prediction = predictDisease(predInput);
-    } catch { prediction = null; }
+Your goal is to assess severity, timeline, and risk factors (like travel or exposures).
+Respond EXACTLY in this format:
+Thanks! A few more questions.
+🗓️ When did these symptoms start?
+🌡️ [Specific question about severity, e.g., What was the highest fever? / Rate pain 1 to 10]
+🛡️ [Context question, e.g., Any recent travel? / Any mosquito bites?]
 
-    const diseaseText = prediction
-      ? `${prediction.disease} (confidence: ${prediction.confidence})`
-      : "Unknown";
-
-    const historyContext = mem.dbHistorySummary
-      ? `\n\nPast conversation history with this patient:\n${mem.dbHistorySummary}\n\nConsider this history — note any recurring symptoms, previous diagnoses, or patterns that may affect this assessment.`
-      : "";
-
-    const predictionPrompt = `You are a friendly medical assistant giving a clear, user-friendly health assessment.
-
-Patient profile:
-${profileText}${historyContext}
-
-Original complaint: "${originalComplaint}"
-Patient's answers to follow-up questions: "${msgEn}"
-Predicted condition from symptom analysis: ${diseaseText}
-
-Write a simple, calm response in plain language. Use this structure exactly:
-
-💡 What this may be: [condition name]
-
-🔄 Other possible reasons: [1-2 alternatives]
-
-✅ What you can do now:
-- [short action 1]
-- [short action 2]
-- [short action 3]
-
-🚨 Get urgent care now if: [1 clear line]
-
-Tone requirements:
-- Be empathetic and non-judgmental
-- Avoid scary wording
-- Keep it concise (max ~140 words)
-
-End with: Risk: Low / Medium / High`;
+(Ask exactly 3 numbered or emoji bullet questions).
+Risk: Low`;
 
     let reply = await smartAI([
-      { role: "system", content: predictionPrompt },
-      ...mem.history.slice(-MAX_HISTORY),
-      { role: "user", content: msgEn },
+      ...mem.history.slice(-4),
+      { role: "system", content: prompt },
+      { role: "user", content: msgEn }
     ]);
 
     if (!reply) {
-      const risk = detectSeverity(originalComplaint);
-      reply = `💡 What this may be: ${prediction?.disease || "a common short-term illness"}\n\n🔄 Other possible reasons: mild viral infection, dehydration\n\n✅ What you can do now:\n- Rest and drink fluids\n- Eat light, easy-to-digest meals\n- Track your symptoms for the next 24 hours\n\n🚨 Get urgent care now if: symptoms become severe, breathing is difficult, or you feel faint.\n\nRisk: ${risk}`;
+      reply = `Thanks! A few more questions.\n🗓️ When did these symptoms start?\n🌡️ How severe are the symptoms on a scale of 1 to 10?\n🛡️ Have you traveled recently or been around anyone sick?\n\nRisk: Low`;
     }
 
-    // Parse and strip "Risk: ..." from reply text so the frontend badge is the single source of truth
-    const { cleanReply: predClean, parsedRisk: predRisk } = parseAndStripRisk(reply);
-    const resolvedPredRisk = predRisk || detectSeverity(originalComplaint);
-    reply = predClean;
+    const { cleanReply, parsedRisk } = parseAndStripRisk(reply);
+    reply = cleanReply;
+
+    if (lang !== "en") reply = await translateText(reply, lang);
+
+    mem.history.push({ role: "user", content: msgEn });
+    mem.history.push({ role: "assistant", content: reply });
+    mem.stage = "prediction";
+
+    const finalReply = `${reply}`;
+    await persistMessages(dbUserId, message, finalReply, lang);
+
+    return {
+      reply: finalReply,
+      prediction: { disease: "None", risk: parsedRisk || "Low", confidence: "0.00", symptomsDetected: mem.lastSymptoms },
+      messageType: "deep_dive",
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // STAGE 3: PREDICTION (Assess & Explain & Advise)
+  // ─────────────────────────────────────────────
+  if (mem.stage === "prediction") {
+    const finalSymptoms = mem.lastSymptoms.length ? mem.lastSymptoms.join(" ") : mem.lastHealthMessage;
+    let prediction = null;
+    
+    try {
+        prediction = predictDisease(finalSymptoms + " " + msgEn);
+    } catch { prediction = null; }
+
+    const diseaseText = prediction ? `${prediction.disease} (confidence: ${prediction.confidence})` : "Unknown condition";
+
+    const prompt = `You are a highly advanced medical AI. 
+Patient's full context:
+Initial: "${mem.lastHealthMessage}"
+Deep dive answers: "${msgEn}"
+Algorithm Prediction: ${diseaseText}
+
+Provide a structured, empathetic summary and advice EXACTLY matching this format (use markdown formatting):
+
+Thank you! Here's what I understood:
+• [Symptom 1]
+• [Symptom 2]
+• [Context detail]
+Is this correct?
+
+Based on your symptoms, this could be related to:
+• **[Top Condition]** (High possibility - ${prediction ? Math.round(parseFloat(prediction.confidence)*100) : 80}%)
+• **[Alternative 1]** (Possible)
+• **[Alternative 2]** (Consider)
+
+**Why?**
+• [1 sentence explaining why the top condition matches the symptoms/context].
+• [1 sentence explaining why it might be the alternative].
+
+**I recommend:**
+✅ [Actionable advice 1, e.g., Rest and stay hydrated]
+✅ [Actionable advice 2]
+⚠️ If symptoms worsen, consult a doctor immediately.
+
+Risk: ${prediction ? (parseFloat(prediction.confidence) > 0.7 ? 'High' : 'Medium') : 'Low'}`;
+
+    let reply = await smartAI([
+      ...mem.history.slice(-6),
+      { role: "system", content: prompt },
+      { role: "user", content: msgEn }
+    ]);
+
+    if (!reply) {
+      reply = `Thank you! Based on your symptoms, this could be related to:\n• **${prediction?.disease || 'Viral Infection'}** (High possibility)\n\n**I recommend:**\n✅ Rest and stay hydrated\n⚠️ If symptoms worsen, consult a doctor immediately.\n\nRisk: Low`;
+    }
+
+    const { cleanReply, parsedRisk } = parseAndStripRisk(reply);
+    reply = cleanReply;
+
+    if (lang !== "en") reply = await translateText(reply, lang);
 
     // Save prediction in DB
     try {
        const dbPred = new Prediction({
            userId: dbUserId !== "default" ? dbUserId : null,
-           symptoms: symptoms,
+           symptoms: mem.lastSymptoms,
            topDisease: prediction?.disease || "Unknown",
            confidence: prediction?.confidence || 0,
-           riskLevel: resolvedPredRisk,
+           riskLevel: parsedRisk || "Low",
            matchedSymptoms: prediction?.symptomsDetected || [],
            topFive: prediction?.topFive || []
        });
        await dbPred.save();
     } catch (e) { console.error('Save Prediction err:', e); }
 
-    if (lang !== "en") reply = await translateText(reply, lang);
-
     mem.history.push({ role: "user", content: msgEn });
     mem.history.push({ role: "assistant", content: reply });
-    mem.stage = "done";
+    
+    // Reset state for next complaint
+    mem.stage = "clarify_symptoms";
+    mem.lastSymptoms = [];
+    mem.lastHealthMessage = null;
 
-    const finalReply = `${reply}\n\n⚠️ This is not medical advice. Consult a healthcare provider.`;
+    const finalReply = `${reply}\n\n*I am an AI, not a doctor. This is not a diagnosis.*`;
     await persistMessages(dbUserId, message, finalReply, lang);
 
     const predPrediction = prediction
-      ? { ...prediction, risk: resolvedPredRisk }
-      : { disease: "Unknown", risk: resolvedPredRisk, confidence: "0.00", symptomsDetected: [] };
-      
-    // Include extra ML info if present
-    if (mlUsed && prediction.shapValues) {
-        predPrediction.explainability = {
-            shapValues: prediction.shapValues,
-            topFive: prediction.topFive,
-            missingSymptoms: prediction.missingSymptoms
-        };
-    }
+      ? { ...prediction, risk: parsedRisk || "Low" }
+      : { disease: "Unknown", risk: parsedRisk || "Low", confidence: "0.00", symptomsDetected: [] };
 
     return {
       reply: finalReply,
@@ -574,33 +473,11 @@ End with: Risk: Low / Medium / High`;
     };
   }
 
-  // ─────────────────────────────────────────────
-  // STAGE 4: DONE — reset for new symptoms, keep history
-  // ─────────────────────────────────────────────
-  mem.stage = "followup";
-  mem.history = mem.history.slice(-MAX_HISTORY); // ✅ keep context, don't wipe
-  mem.lastSymptoms = [];
-  mem.lastHealthMessage = msgEn;
-  mem.pendingMessage = null;
-
-  const symptoms = await extractSymptoms(msgEn);
-  const [q1, q2] = getRuleBasedFollowup(symptoms, msgEn);
-  let reply = `I see you have new symptoms. Let me ask a couple of questions first.\n\n1. ${q1}\n2. ${q2}`;
-  const resetRisk = detectSeverity(msgEn);
-  if (lang !== "en") reply = await translateText(reply, lang);
-
-  mem.history.push({ role: "user", content: msgEn });
-  mem.history.push({ role: "assistant", content: reply });
-  mem.stage = "prediction";
-  mem.lastSymptoms = symptoms;
-
-  const finalReply = `${reply}\n\n⚠️ This is not medical advice.`;
-  await persistMessages(dbUserId, message, finalReply, lang);
-
+  // Fallback
   return {
-    reply: finalReply,
-    prediction: { disease: "None", risk: resetRisk, confidence: "0.00", symptomsDetected: symptoms },
-    messageType: "followup",
+    reply: "I'm sorry, I encountered an error understanding your request. Please try again.",
+    prediction: { disease: "Unknown", risk: "Low", confidence: "0.00", symptomsDetected: [] },
+    messageType: "error"
   };
 }
 
@@ -611,7 +488,6 @@ async function chatWithAI(req, res) {
   try {
     const { message, lang, type, answers, context } = req.body;
 
-    // Build a message string from intake answers when the frontend sends an analysis request
     let resolvedMessage = message;
     if (type === "analysis" && answers && typeof answers === "object") {
       const parts = [];
@@ -622,7 +498,6 @@ async function chatWithAI(req, res) {
       if (answers.extra && answers.extra.toLowerCase() !== "none") parts.push(`Other symptoms: ${answers.extra}`);
       resolvedMessage = parts.join(". ") || message;
     } else if (type === "followup" && !resolvedMessage && context) {
-      // Fallback: use context if message is missing in followup mode
       resolvedMessage = message;
     }
 
