@@ -24,7 +24,6 @@ def train():
     rf.fit(X, y_encoded)
     
     # Save models but we need to patch classes_ for the predictor logic
-    xgb.classes_ = le.classes_
     rf.classes_ = le.classes_
     
     os.makedirs(settings.MODEL_DIR, exist_ok=True)
