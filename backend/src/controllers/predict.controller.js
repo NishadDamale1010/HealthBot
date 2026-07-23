@@ -1,5 +1,4 @@
 const { predictDisease, predictDiseaseEnhanced } = require("../utils/symptoms");
-const mlClient = require('../services/mlClient');
 
 exports.predict = (req, res) => {
     const { symptoms } = req.body;
@@ -29,21 +28,16 @@ exports.predictEnhanced = async (req, res) => {
         const { symptoms } = req.body;
         if (!symptoms) return res.status(400).json({ success: false, message: "Symptoms required" });
         
-        let prediction = null;
-        if (await mlClient.isAvailable()) {
-            prediction = await mlClient.predictFromText(Array.isArray(symptoms) ? symptoms.join(" ") : symptoms);
-        }
+        // Use native Node.js algorithm directly
+        const fallback = Array.isArray(symptoms) ? symptoms.join(" ") : symptoms;
+        const top5 = predictDiseaseEnhanced(fallback);
         
-        if (!prediction) {
-            const fallback = Array.isArray(symptoms) ? symptoms.join(" ") : symptoms;
-            const top5 = predictDiseaseEnhanced(fallback);
-            prediction = {
-                topDisease: top5[0]?.disease || "Unknown",
-                confidence: top5[0]?.confidence || 0,
-                topFive: top5,
-                riskLevel: top5[0]?.riskLevel || "Low"
-            };
-        }
+        const prediction = {
+            topDisease: top5[0]?.disease || "Unknown",
+            confidence: top5[0]?.confidence || 0,
+            topFive: top5,
+            riskLevel: top5[0]?.riskLevel || "Low"
+        };
         
         res.status(200).json({ success: true, data: prediction });
     } catch (err) {
