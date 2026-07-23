@@ -158,24 +158,26 @@ export default function Chat() {
       </div>
 
       {/* Input Area */}
-      <div className="flex-none p-3 glass-panel border-t border-[var(--glass-border)] z-20 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-        <SymptomChips 
-          symptoms={symptoms} 
-          onAdd={(sym) => !symptoms.includes(sym) && setSymptoms([...symptoms, sym])}
-          onRemove={(sym) => setSymptoms(symptoms.filter(s => s !== sym))}
-        />
+      <div className="flex-none px-3 pt-2 pb-safe bg-gradient-to-t from-[var(--bg-secondary)] via-[var(--bg-secondary)] to-transparent z-20 pb-4">
+        <div className="mb-2">
+          <SymptomChips 
+            symptoms={symptoms} 
+            onAdd={(sym) => !symptoms.includes(sym) && setSymptoms([...symptoms, sym])}
+            onRemove={(sym) => setSymptoms(symptoms.filter(s => s !== sym))}
+          />
+        </div>
         
-        <form onSubmit={handleSend} className="flex items-end gap-2 relative">
-          <div className="flex-1 relative">
+        <form onSubmit={handleSend} className="flex items-end gap-2 relative max-w-full">
+          <div className="flex-1 relative glass-panel rounded-3xl border border-[var(--glass-border)] shadow-lg overflow-hidden flex items-end bg-[var(--bg-card)]">
             <textarea
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Type your symptoms..."
-              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--radius-lg)] py-3 pl-4 pr-12 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none overflow-hidden max-h-32 transition-all"
+              className="w-full bg-transparent border-none py-[14px] pl-5 pr-[52px] text-[15px] outline-none resize-none overflow-hidden max-h-32 placeholder:text-[var(--text-secondary)] placeholder:font-light"
               rows={1}
               onInput={(e) => {
                 e.target.style.height = 'auto';
-                e.target.style.height = e.target.scrollHeight + 'px';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -184,7 +186,7 @@ export default function Chat() {
                 }
               }}
             />
-            <div className="absolute right-2 bottom-2">
+            <div className="absolute right-1 bottom-1">
               <VoiceButton 
                 isListening={isListening} 
                 onClick={(e) => { e.preventDefault(); isListening ? stopListening() : startListening(); }}
@@ -195,10 +197,10 @@ export default function Chat() {
           <button 
             type="submit"
             disabled={(!inputValue.trim() && symptoms.length === 0) || isLoading}
-            className="w-12 h-12 flex-none rounded-[var(--radius-lg)] bg-primary text-white flex items-center justify-center hover:bg-[var(--color-primary-dark)] active:scale-95 disabled:opacity-50 disabled:active:scale-100 transition-all shadow-md"
+            className="w-12 h-12 flex-none rounded-full bg-gradient-to-br from-primary to-teal-500 text-white flex items-center justify-center hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-90 disabled:opacity-50 disabled:active:scale-100 transition-all shadow-[0_4px_14px_rgba(16,185,129,0.25)]"
           >
-            <svg className="w-5 h-5 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            <svg className="w-[22px] h-[22px] transform rotate-90 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
         </form>
