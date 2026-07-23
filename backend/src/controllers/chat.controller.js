@@ -5,7 +5,6 @@ const mongoose = require("mongoose");
 
 const User = require("../models/user");
 const ChatMessage = require("../models/chatMessage");
-const mlClient = require('../services/mlClient');
 const sessionManager = require('../services/sessionManager');
 const emergencyService = require('../services/emergencyService');
 const Prediction = require('../models/prediction');
@@ -474,22 +473,10 @@ Risk: Low`;
     let prediction = null;
     let mlUsed = false;
     
-    // Try ML Client
-    const isMlAvail = await mlClient.isAvailable();
-    if (isMlAvail) {
-        const mlResult = await mlClient.predictFromText(symptoms.length ? symptoms.join(" ") : originalComplaint);
-        if (mlResult && mlResult.confidence > 0.6) {
-           prediction = mlResult;
-           mlUsed = true;
-        }
-    }
-    
-    if (!prediction) {
-      try {
+    try {
         const predInput = symptoms.length ? symptoms.join(" ") : originalComplaint;
         prediction = predictDisease(predInput);
-      } catch { prediction = null; }
-    }
+    } catch { prediction = null; }
 
     const diseaseText = prediction
       ? `${prediction.disease} (confidence: ${prediction.confidence})`

@@ -1,8 +1,0 @@
-__pycache__/
-*.pyc
-.env
-vectorstore/
-app/artifacts/models/*.joblib
-*.egg-info/
-dist/
-build/
