@@ -22,19 +22,19 @@ def _init_models():
             print("Models not found, training...")
             train()
             predictor.load_models()
-        print("✅ ML models loaded successfully")
+        print("ML models loaded successfully")
     except Exception as e:
-        print(f"⚠️ ML startup error (non-fatal): {e}")
+        print(f"ML startup error (non-fatal): {e}")
 
     try:
         from app.rag.ingest import ingest_documents
         ingest_documents()
-        print("✅ RAG knowledge base ingested successfully")
+        print("RAG knowledge base ingested successfully")
     except Exception as e:
-        print(f"⚠️ RAG ingestion error (non-fatal): {e}")
+        print(f"RAG ingestion error (non-fatal): {e}")
 
     _ready = True
-    print("🚀 AI Service fully ready!")
+    print("AI Service fully ready!")
 
 app = FastAPI(
     title="HealthBot AI Service",

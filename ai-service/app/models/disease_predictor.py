@@ -41,7 +41,7 @@ class DiseasePredictor:
             prob = float(final_probs[idx])
             if prob > settings.CONFIDENCE_THRESHOLD:
                 results.append({
-                    "disease": self.xgb_model.classes_[idx],
+                    "disease": self.rf_model.classes_[idx],
                     "probability": round(prob, 4)
                 })
         return results
