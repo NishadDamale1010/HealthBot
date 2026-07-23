@@ -1,11 +1,17 @@
-﻿from app.config import settings
+from app.config import settings
 from app.rag.embeddings import embedding_model
 from app.rag.ingest import get_chroma_client
 
 class Retriever:
     def __init__(self):
-        self.client = get_chroma_client()
-        self.collection = self.client.get_or_create_collection(name=settings.COLLECTION_NAME)
+        self._collection = None
+        
+    @property
+    def collection(self):
+        if self._collection is None:
+            client = get_chroma_client()
+            self._collection = client.get_or_create_collection(name=settings.COLLECTION_NAME)
+        return self._collection
     
     def search(self, query: str, top_k: int = 3):
         query_embedding = embedding_model.embed_text(query)

@@ -8,7 +8,7 @@ class DiseasePredictor:
     def __init__(self):
         self.xgb_model = None
         self.rf_model = None
-        self.load_models()
+        # Lazy loading: models are loaded in main.py background thread
         
     def load_models(self):
         try:
