@@ -104,10 +104,6 @@ export default function AISuite() {
   const [lab, setLab] = useState(null);
   const [advanced, setAdvanced] = useState(null);
   const [ultra, setUltra] = useState(null);
-  const [skinResult, setSkinResult] = useState(null);
-  const [skinPreview, setSkinPreview] = useState("");
-  const [labText, setLabText] = useState("Hemoglobin: 10.9, Glucose: 112, Vitamin D: 17");
-  const [labExplain, setLabExplain] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const featureCount = useMemo(() => FEATURE_GROUPS.reduce((sum, group) => sum + group.items.length, 0), []);
@@ -195,41 +191,6 @@ export default function AISuite() {
     }
   };
 
-  const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-  const onSkinImageChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    setLoading(true);
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      setSkinPreview(dataUrl);
-      const { data } = await API.post("/api/intelligence/skin-detect", {
-        imageBase64: dataUrl,
-        mimeType: file.type,
-        notes: symptoms,
-      });
-      setSkinResult(data);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const runLabExplain = async () => {
-    setLoading(true);
-    try {
-      const { data } = await API.post("/api/intelligence/lab-report-explain", { reportText: labText });
-      setLabExplain(data);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAction = async (actionKey) => {
     if (actionKey === "progression-untreated") return runProgression(false);
     if (actionKey === "progression-treated") return runProgression(true);
@@ -297,21 +258,11 @@ export default function AISuite() {
           </div>
 
           <div className="ai-card ai-side-card">
-            <h3>Image-based Skin Detection</h3>
-            <input type="file" accept="image/*" onChange={onSkinImageChange} />
-            {skinPreview && <img src={skinPreview} alt="skin preview" className="ai-preview" />}
-            {skinResult && (
-              <div className="ai-result-box">
-                <p><strong>Condition:</strong> {skinResult.condition || skinResult.detected_condition}</p>
-                <p><strong>Confidence:</strong> {skinResult.confidencePercent ?? Math.round((skinResult.confidence || 0) * 100)}%</p>
-                <p><strong>Severity:</strong> {skinResult.severity}</p>
-              </div>
-            )}
-
-            <h3 style={{ marginTop: 16 }}>Lab Report Explanation</h3>
-            <textarea className="ai-textarea" value={labText} onChange={(e) => setLabText(e.target.value)} />
-            <button className="ai-action-btn primary" onClick={runLabExplain} disabled={loading}>📄 Explain Report</button>
-            {labExplain && <p className="ai-note">{labExplain.summary}</p>}
+            <h3>Diagnostics moved to dedicated workspace</h3>
+            <p className="ai-note">
+              Image upload and lab report analysis have been moved to the dedicated <strong>AI Diagnostics</strong> page for a cleaner flow.
+            </p>
+            <a className="ai-action-btn primary" href="/ai-diagnostics">🔬 Open AI Diagnostics</a>
           </div>
         </section>
 
